@@ -1,30 +1,6 @@
 # NotMayasabha
 
-SIH problem statement: 
-SIH1773 | Conversion of 2D Blueprints into 3D Model
-
-Description:
-1. National Security Guard (NSG) operates inside buildings, built up areas and other infrastructures like metro stations, schools, etc in case of any terror. Since the operations are of National security significance, better understanding of the target layout is of paramount importance. 3-Dimensional walk through of the buildings helps in the efficient understanding of the target layout and also enables effective briefing of the troops by the Commander for operating inside such targets.
-
-2. Presently, the building authorities provide 2-Dimensional layout of the building in the form of blue prints/ floor plan. Assimilation of the situation and appreciating the potent threat with the help of 2-Dimensional layout turns out to be a challenging task. In such a scenario, a 3-Dimensional walk-through of the building helps significantly in increasing the efficiency of the ground forces while operating.
-
-3. The software which needs to be developed should take the 2-Dimensional blueprint layout as input and also should take various parameters like length, breadth, height of the building, layout of staircase, entry and exit, etc as additional inputs. The software should then export them to a file and create a full fledged 3-Dimensional walkthrough model of the building. The software must also include the facility for integration of exported model to the offline Google maps, Satellite pictures (if any available).
-
-4. Since the target includes buildings which are secretive in nature, the software is required to be operable fully in standalone mode, without any internet connectivity required in future. For the initial installation phase, the system can be connected to the internet to facilitate fetching up of Maps, satellite imagery from open source, etc required for the software functioning.
-
-5. This software would also reduce the time taken during the initial briefing of the troops prior to the launch of any operation. It further increases the efficiency of the operations, thus resulting in early success.
-
-6. The conversion of 2-Dimensional blueprints to 3-Dimensional models must address following problems.
-
-(a) Software should take 2-Dimensional blueprint as an input and produce 3- Dimensional walk through as output.
-(b) Provisions to input parameters like length, breadth, height of the building and other details should be included.
-(c) Minimum supervision from the user end should be needed to finalise the conversion.
-(d) Offline integration with Google maps, satellite imagery to get enhanced output covering the nearby geographical areas as well.
-
-**A 2D building blueprint becomes an offline, correctable, tactical 3D walkthrough.
-A commander can brief an assault team in minutes, on an air-gapped laptop.**
-
-**Live: [notmayasabha](https://notmayasabha.vercel.app)**
+**[notmayasabha](https://notmayasabha.vercel.app)**
 
 ```bash
 npm install
@@ -32,47 +8,25 @@ npm run dev        # http://127.0.0.1:5173
 npm run test-all   # types, layer lint, fixture, headless pipeline, production build
 ```
 
-No API keys. No server. No network call at run time — the app refuses them and counts them.
+SIH problem statement: 
+SIH1773 | Conversion of 2D Blueprints into 3D Model
+
+Description:
+1. National Security Guard (NSG) operates inside buildings, built up areas and other infrastructures like metro stations, schools, etc in case of any terror. Since the operations are of National security significance, better understanding of the target layout is of paramount importance. 3-Dimensional walk through of the buildings helps in the efficient understanding of the target layout and also enables effective briefing of the troops by the Commander for operating inside such targets.
+2. Presently, the building authorities provide 2-Dimensional layout of the building in the form of blue prints/ floor plan. Assimilation of the situation and appreciating the potent threat with the help of 2-Dimensional layout turns out to be a challenging task. In such a scenario, a 3-Dimensional walk-through of the building helps significantly in increasing the efficiency of the ground forces while operating.
+3. The software which needs to be developed should take the 2-Dimensional blueprint layout as input and also should take various parameters like length, breadth, height of the building, layout of staircase, entry and exit, etc as additional inputs. The software should then export them to a file and create a full fledged 3-Dimensional walkthrough model of the building. The software must also include the facility for integration of exported model to the offline Google maps, Satellite pictures (if any available).
+4. Since the target includes buildings which are secretive in nature, the software is required to be operable fully in standalone mode, without any internet connectivity required in future. For the initial installation phase, the system can be connected to the internet to facilitate fetching up of Maps, satellite imagery from open source, etc required for the software functioning.
+5. This software would also reduce the time taken during the initial briefing of the troops prior to the launch of any operation. It further increases the efficiency of the operations, thus resulting in early success.
+6. The conversion of 2-Dimensional blueprints to 3-Dimensional models must address following problems.
+- Software should take 2-Dimensional blueprint as an input and produce 3- Dimensional walk through as output.
+- Provisions to input parameters like length, breadth, height of the building and other details should be included.
+- Minimum supervision from the user end should be needed to finalise the conversion.
+- Offline integration with Google maps, satellite imagery to get enhanced output covering the nearby geographical areas as well.
+
+A 2D building blueprint becomes an offline, correctable, tactical 3D walkthrough.
+A commander can brief an assault team in minutes, on an air-gapped laptop.
 
 ---
-
-## What runs today
-
-| | |
-|---|---|
-| **Frozen document** | Two storeys, 41 walls, 29 openings, 13 rooms, 1 stair, hand-authored, schema `2.1.0` |
-| **Geometry** | Wall panelisation with real openings, junctions solved by half-thickness extension, stepped stair solid — all in TypeScript, in the browser |
-| **Rooms** | Flood fill from seed points over an occupancy grid. Areas measured from wall faces, not centrelines |
-| **Walkthrough** | First person, 1.6 m eye height, grid collision, walks up the stair between storeys |
-| **Analysers** | Bridges (critical doors), articulation points (critical rooms), betweenness, shortest route, isolation, dead ends |
-| **Scale engine** | `UNSCALED / PROVISIONAL / VALIDATED`, five semantic sanity checks, two-click calibration, one-click factor fixes |
-| **Review** | Findings with anchors, warnings accepted with a written reason, `DRAFT → REVIEWED → LOCKED` |
-| **Audit** | Every operator action is an op with a `prev_hash`. Undo by state cache. Tamper check by replay |
-| **Briefing Mode** | Five keyboard-driven steps. Gated on `LOCKED` |
-| **Geo context** | Neighbouring blocks extruded and roads drawn from an offline area pack |
-| **Offline proof** | Runtime kill switch plus a build-time import lint |
-| **Export** | GLB, and the op log as `.jsonl` |
-
-Not built, and why: `docs/POST_SIH.md`.
-
----
-
-## The five-minute demo
-
-Rehearse it five times. Time it. The demo decides the result more than the code does.
-
-| Time | Do this | Say this |
-|---|---|---|
-| 0:00 | Title slide only | "A commander gets a paper floor plan. He has twenty minutes to brief an assault team. We give him a 3D walkthrough in under a minute, on a laptop with no internet." |
-| 0:30 | **Turn the network adapter off, on screen.** Point at the SEALED badge | "This machine is now offline. The badge is not decoration — the app counts every outbound attempt and refuses it. It reads zero." |
-| 0:45 | Doll-house view. Click a room in 3D → it highlights in the 2D plan | "One model, two views. Same room ID. There is no second representation to drift." |
-| 1:15 | **Click Clear scale** | "Watch what happens when the system does not know the scale." Red banner. Areas read UNAVAILABLE. Export greys out. "It refuses to answer. A commander told a corridor is 2.0 m wide when it is 1.2 m is worse off than a commander told nothing." |
-| 1:45 | **Calibrate: two clicks on the plan, type 20** | "Two clicks. That is what minimum supervision looks like. Five sanity checks now pass — door width, wall thickness, corridor width, footprint against the length he typed in, smallest room." |
-| 2:15 | Walkthrough. In the front door, along the corridor, **up the stairs** | Say nothing for five seconds. Let it speak |
-| 3:00 | Route: Exterior → Server Room. Then the bridges list | "Two doors are **bridges** — remove one and the building splits in two. A door is an edge, so the critical-door question is a bridge question. The **rooms** whose removal splits the building are the articulation points: the corridor and the stairwell. Sealing the stair isolates six spaces." |
-| 3:45 | Select a wall → **Mark breachable**, type a reason. Show the audit log | "A human ticked that box and the reason is in the log. We claim no structural inference we do not have." |
-| 4:15 | Mark REVIEWED → LOCK → Briefing Mode, arrow through five steps | "Briefing is gated on the document status, not on the interface. An unverified model cannot reach a commander." |
-| 4:45 | Neighbourhood view + Export GLB | "Still offline. The area pack was downloaded at install time." |
 
 ### The three lines that win the round
 
@@ -83,21 +37,16 @@ Rehearse it five times. Time it. The demo decides the result more than the code 
 3. "Minimum supervision is not zero supervision. It is measured supervision — here is
    the correction density for this document."
 
-### Honesty notes — say these before a judge finds them
-
+### Honesty notes
 - The blueprint is a **hand-authored fixture**, not a parsed scan. Perception is the
   deferred module, deliberately, so the demo does not depend on the riskiest part.
 - The neighbourhood pack is **hand-authored in the OpenStreetMap schema**, not real OSM
   data. The UI says so. Swapping in real PMTiles is a data change, not a code change.
 - The content hash is FNV-1a, not SHA-256. It is a cache and tamper key, not a signature.
 
----
-
-## Tactical markers — what every colour in the 3D view means
-
-Nothing in the viewer is decorative. Every colour is a computed property of the room
-graph, drawn in `src/view3d/overlays.ts`. If you can't say what a marker means, don't
-point at it.
+## Tactical markers 
+what every colour in the 3D view means
+Every colour is a computed property of the room graph, drawn in `src/view3d/overlays.ts`. 
 
 | Marker | Colour / shape | Meaning |
 |---|---|---|
@@ -157,36 +106,10 @@ instead of a picture — and once it's a graph, sixty years of graph theory is f
 
 ## What to tell the judges
 
-This is an internal SIH selection round, not a stage pitch. Two faculty visits:
-**2:30 PM** is unscored mentoring — get real feedback, don't perform for it. **4:00 PM**
-is the evaluation, and it scores how well you engaged with that feedback, not whether
-you agreed with all of it. You are explicitly allowed to defend a decision to not
-take a piece of feedback — with a reason, not a shrug.
-
-What they are actually checking for, in order:
-
-1. **Do you understand the real problem, and who has it** — not the technology you
-   wanted to use. Lead every answer with the commander under time pressure, not with
-   three.js or graph theory.
-2. **Does the solution genuinely follow from the problem**, or was the problem
-   reverse-engineered to justify a tool you liked? If asked "why graph theory," the
-   honest answer is the problem statement itself: NSG needs chokepoints and critical
-   rooms, and a room graph is the only representation that can answer that question
-   at all — a rendered mesh cannot.
-3. **Did you engage with round-1 feedback** — by 4:00 PM, be ready to say plainly
-   what changed and, just as importantly, what you deliberately did *not* change and
-   why.
-4. **Is there a realistic, buildable 36-hour plan** with named ownership — not "we'll
-   figure it out." Use the day-by-day plan and the six roles in `docs/sih.md` §15 as
-   the answer, not an aspiration.
-
-### The sentence to open with
-
 > "A commander gets a paper floor plan. He has twenty minutes to brief an assault
 > team. We give him a 3D walkthrough in under a minute, on a laptop with no internet."
 
-Say this before any mention of three.js, TypeScript, or graph theory. Technology is
-the answer to a question the judges haven't asked yet.
+Say this before any mention of three.js, TypeScript, or graph theory. 
 
 ### The best three things to actually show
 
@@ -320,46 +243,31 @@ between the design documents in `docs/`.
 
 ---
 
-### 5 Technical Questions You Might Face
-
 #### Q1: "Why generate 3D meshes in client-side TypeScript instead of a server-side Python engine like Blender or PyTorch?"
-
 * **Answer:** Speed, stability, and offline readiness. Moving geometry generation to the browser drops rebuild times from ~200ms (network roundtrip) to ~30ms. More importantly, if a Python backend segfaults or dies on stage, a static web bundle keeps rendering the 3D model without a server process alive.
 
 #### Q2: "How do you handle floor plan scaling without risking incorrect real-world dimensions?"
-
 * **Answer:** We keep plan space in document units (`_u`) and vertical space in metres (`_m`). Scale is managed through a strict state machine (`UNSCALED` $\rightarrow$ `PROVISIONAL` $\rightarrow$ `VALIDATED`). If scale isn't mathematically proven via calibration vectors or DXF metadata, the system stays `UNSCALED`, blocks tactical metrics, and renders a red warning banner.
 
 #### Q3: "How do you extract rooms accurately without flood-fills leaking outdoors through open doors?"
-
 * **Answer:** We build a dual-layer 5 cm occupancy grid per storey. The `wallMask` leaves door openings uncarved so room flood-fills stop at doorway lines. The `walkMask` carves out doors so pathfinding algorithms can traverse them.
 
 #### Q4: "How do you prevent network leaks on an air-gapped military laptop?"
-
 * **Answer:** We enforce security at two levels: a build-time import linter that fails the build if low-level core modules import network libraries, and a runtime kill switch (`netguard.ts`) that intercepts native browser network APIs (`fetch`, `WebSocket`, `EventSource`) and kills non-loopback connections.
 
 #### Q5: "How do you prevent floating-point drift and broken wall corners when editing nodes?"
-
 * **Answer:** Walls do not store raw end coordinates. They reference $Node\ IDs$ in a shared storey graph. Moving a corner edits a single $Node$, updating all connected walls simultaneously without gap drift.
 
----
-
-### 5 Product / Operational Questions You Might Face
-
 #### Q1: "What happens if the CV model misidentifies a wall or misses a door during a live mission?"
-
 * **Answer:** Invariant I1 states perception has zero write access to truth. It only emits confidence-scored proposals. A human operator reviews the triage queue, accepts valid walls, and manually adds missing items before locking the document for Briefing Mode.
 
 #### Q2: "Why use OpenStreetMap data instead of Google Satellite Imagery for neighbourhood surroundings?"
-
 * **Answer:** Google Maps Platform policies explicitly prohibit offline caching and air-gapped usage. OSM and Copernicus Sentinel-2 data permit offline packaging, letting us legally bundle local urban terrain directly onto an air-gapped laptop.
 
 #### Q3: "How long does it take an operator to turn a raw 2D scan into a locked 3D brief?"
-
 * **Answer:** Calibration takes under 10 seconds (clicking two points). Reviewing proposals using bulk shortcuts takes ~2 minutes. A complete 3D tactical brief is ready in under 5 minutes.
 
 #### Q4: "How does this scale to multi-storey high-rises or large complexes?"
-
 * **Answer:** Each storey is its own planar graph. Vertical transitions (stairs and elevators) act as inter-storey edges linking room graphs across levels. Large complexes are handled as multi-building assemblies anchored to a shared georeferenced coordinate frame.
 
 #### Q5: "How is this different from existing CAD / BIM software like Autodesk Revit?"
