@@ -13,7 +13,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { SiteDocument, Storey, RoomUse } from '../core/types';
 import { planStorey } from './walls';
-import { roomRects, nodeMap, wallSeg, openingCentre, type Grid } from '../core/grid';
+import { roomRects, roomAt, nodeMap, wallSeg, openingCentre, type Grid } from '../core/grid';
 
 export const FLOOR_TINT: Record<RoomUse, number> = {
   CORRIDOR: 0x4a5568,
@@ -82,6 +82,56 @@ function storeyWallGeometry(st: Storey): THREE.BufferGeometry | null {
   return merged;
 }
 
+/** The floor tint of whichever room sits just past a wall face, or null outdoors/void. */
+function sideTint(g: Grid, rooms: Storey['rooms'], x: number, y: number): THREE.Color | null {
+  const idx = roomAt(g, x, y);
+  if (idx < 0) return null;
+  const hex = FLOOR_TINT[rooms[idx].use];
+  return hex === undefined ? null : new THREE.Color(hex);
+}
+
+/**
+ * Interior walls only, vertex-coloured a faint wash of whichever room(s) they face.
+ * Every wall in the fixture is the same two greys today, which reads fine in the
+ * doll-house but leaves a first-person walker with no idea which room they are in —
+ * the floor tint they'd use for that is out of the frame at eye height. Reusing
+ * FLOOR_TINT keeps a room's walls, floor and HUD label all the same colour family.
+ */
+function storeyInteriorWallGeometry(st: Storey, g: Grid): THREE.BufferGeometry | null {
+  const parts: THREE.BufferGeometry[] = [];
+  const white = new THREE.Color(0xffffff);
+  const WASH = 0.16;
+  for (const p of planStorey(st)) {
+    const L = p.length;
+    if (L < 1e-9) continue;
+    const ux = (p.bx - p.ax) / L, uy = (p.by - p.ay) / L;
+    const nx = -uy, ny = ux;
+    const probe = p.wall.thickness_u / 2 + 0.35;
+    const angle = Math.atan2(-uy, ux);
+    for (const pan of p.panels) {
+      const sMid = (pan.s0 + pan.s1) / 2;
+      const px = p.ax + ux * sMid, py = p.ay + uy * sMid;
+      const cy = st.elevation_m + (pan.z0 + pan.z1) / 2;
+      const geo = boxAt(px, cy, py, pan.s1 - pan.s0, pan.z1 - pan.z0, p.wall.thickness_u, angle);
+
+      const a = sideTint(g, st.rooms, px + nx * probe, py + ny * probe);
+      const b = sideTint(g, st.rooms, px - nx * probe, py - ny * probe);
+      const tint = a && b ? a.clone().lerp(b, 0.5) : a ?? b;
+      const c = tint ? white.clone().lerp(tint, WASH) : white;
+
+      const n = geo.attributes.position.count;
+      const col = new Float32Array(n * 3);
+      for (let i = 0; i < n; i++) { col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b; }
+      geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+      parts.push(geo);
+    }
+  }
+  if (parts.length === 0) return null;
+  const merged = mergeGeometries(parts, false);
+  parts.forEach((p) => p.dispose());
+  return merged;
+}
+
 function roomFloorGeometry(g: Grid, idx: number, y: number): THREE.BufferGeometry | null {
   const rects = roomRects(g, idx);
   if (rects.length === 0) return null;
@@ -99,7 +149,12 @@ export function buildSiteMeshes(doc: SiteDocument, grids: Map<string, Grid>): Si
   const storeys = new Map<string, StoreyMeshes>();
 
   const wallMatExt = new THREE.MeshStandardMaterial({ color: 0x9aa0a6, roughness: 0.95, metalness: 0.0 });
-  const wallMatInt = new THREE.MeshStandardMaterial({ color: 0xb8bcc0, roughness: 0.95, metalness: 0.0 });
+  // storeyInteriorWallGeometry writes a near-white vertex colour lerped toward the
+  // adjoining room's floor tint; multiplied against this base grey it shifts hue
+  // per room without changing overall brightness.
+  const wallMatInt = new THREE.MeshStandardMaterial({
+    color: 0xb8bcc0, roughness: 0.95, metalness: 0.0, vertexColors: true,
+  });
 
   for (const st of doc.storeys) {
     const grid = grids.get(st.id)!;
@@ -110,7 +165,7 @@ export function buildSiteMeshes(doc: SiteDocument, grids: Map<string, Grid>): Si
     const extOnly: Storey = { ...st, walls: st.walls.filter((w) => isExt(w.wall_class)) };
     const intOnly: Storey = { ...st, walls: st.walls.filter((w) => !isExt(w.wall_class)) };
     const geoExt = storeyWallGeometry(extOnly);
-    const geoInt = storeyWallGeometry(intOnly);
+    const geoInt = storeyInteriorWallGeometry(intOnly, grid);
 
     const wallGroup = new THREE.Group();
     let wallsMesh: THREE.Mesh = new THREE.Mesh();

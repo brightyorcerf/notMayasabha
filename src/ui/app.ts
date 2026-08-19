@@ -14,7 +14,7 @@ import { health } from '../core/netguard';
 import { buildSiteMeshes } from '../geometry/build3d';
 import {
   buildRoomGraph, bridges, articulationPoints, betweenness,
-  nodeKey, type RoomGraph,
+  nodeKey, OUTSIDE, type RoomGraph,
 } from '../analysis/graph';
 import { Viewer } from '../view3d/viewer';
 import { Overlays } from '../view3d/overlays';
@@ -318,19 +318,42 @@ export function start(): void {
   viewer.setRoofVisible(false);
 
   // ------------------------------------------------------------------ modes
+  const setWalkUI = (walking: boolean): void => {
+    $('btn-walk').classList.toggle('on', walking);
+    $('btn-orbit').classList.toggle('on', !walking);
+  };
+
   $('btn-walk').onclick = () => {
-    $('btn-walk').classList.add('on');
-    $('btn-orbit').classList.remove('on');
+    setWalkUI(true);
     const entry = gr.edges.find((e) => e.is_entry);
-    const target = new THREE.Vector3(10 * viewer.mpu, 1.6, 6 * viewer.mpu);
-    if (entry) viewer.enterWalk(entry.point_u[0] * viewer.mpu, (entry.point_u[1] - 3.5) * viewer.mpu, target);
-    else viewer.enterWalk(10 * viewer.mpu, -6 * viewer.mpu, target);
+    if (!entry) {
+      viewer.enterWalk(10 * viewer.mpu, -6 * viewer.mpu, new THREE.Vector3(10 * viewer.mpu, 1.6, 0));
+      return;
+    }
+    // The interior side of the entry edge tells us which way is "in": stand outside
+    // the door along that line and look back at the room, whichever way the building
+    // actually faces. A fixed world-space target only worked for one building.
+    const insideKey = entry.a === OUTSIDE ? entry.b : entry.a;
+    const inside = gr.nodes.get(insideKey);
+    const [dx, dy] = entry.point_u;
+    const ix = inside ? dx - inside.centre_u[0] : 0;
+    const iy = inside ? dy - inside.centre_u[1] : -1;
+    const len = Math.hypot(ix, iy) || 1;
+    const nx = ix / len, ny = iy / len;
+    const spawnX = dx + nx * 3.5, spawnY = dy + ny * 3.5;
+    const lookX = inside ? inside.centre_u[0] : dx - nx * 3.5;
+    const lookY = inside ? inside.centre_u[1] : dy - ny * 3.5;
+    const target = new THREE.Vector3(lookX * viewer.mpu, 1.6, lookY * viewer.mpu);
+    viewer.enterWalk(spawnX * viewer.mpu, spawnY * viewer.mpu, target);
   };
   $('btn-orbit').onclick = () => {
-    $('btn-orbit').classList.add('on');
-    $('btn-walk').classList.remove('on');
+    setWalkUI(false);
     viewer.enterOrbit();
   };
+  // Esc unlocks the pointer at the browser level even when we never asked for it
+  // to. Without this the app was left thinking it was still in WALK mode: WASD kept
+  // moving the (now static) camera and the Walkthrough button stayed lit.
+  viewer.onWalkExit = () => setWalkUI(false);
 
   viewer.onRoomEnter = (roomId) => {
     if (!roomId) { $('hud-room').textContent = 'Exterior'; return; }

@@ -64,6 +64,8 @@ export class Viewer {
   private locked = false;
   private lookTarget = new THREE.Vector3();
   onRoomEnter: ((roomId: string | null) => void) | null = null;
+  /** Fired when the walkthrough ends by any means other than clicking Doll-house. */
+  onWalkExit: (() => void) | null = null;
   private lastRoom: string | null = null;
   /** Exterior wall materials, de-duplicated. X-ray mode reaches through these. */
   private extWallMats = new Set<THREE.MeshStandardMaterial>();
@@ -182,7 +184,18 @@ export class Viewer {
       if (e.code === 'ShiftLeft') e.preventDefault();
     });
     addEventListener('keyup', (e) => this.keys.delete(e.code));
-    this.lock.addEventListener('unlock', () => { if (this.mode === 'WALK') this.keys.clear(); });
+    // A keyup can be lost entirely — alt-tab, a devtools focus grab, the OS eating the
+    // combo — leaving a key "held" forever and the camera drifting with no input.
+    addEventListener('blur', () => this.keys.clear());
+    // Esc unlocks the pointer at the browser level whether or not we asked for it. If
+    // we only cleared `keys` here, the app was left believing it was still walking:
+    // orbit stayed disabled and nothing told the UI the mode had changed.
+    this.lock.addEventListener('unlock', () => {
+      this.keys.clear();
+      if (this.mode !== 'WALK') return;
+      this.enterOrbit();
+      this.onWalkExit?.();
+    });
 
     this.resize();
     addEventListener('resize', () => this.resize());
@@ -237,6 +250,7 @@ export class Viewer {
   enterWalk(x: number, z: number, yawTo?: THREE.Vector3): void {
     if (this.locked) return;
     this.mode = 'WALK';
+    this.keys.clear();
     this.stopCinematic();
     this.orbit.enabled = false;
     this.setXray(this.xray);
