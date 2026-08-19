@@ -1,5 +1,5 @@
 /**
- * Mayasabha shell styling.
+ * NotMayasabha shell styling.
  *
  * Takes:   the markup in index.html and the class names emitted by src/ui/panels.ts.
  * Returns: a light, cool-tinted operator shell wrapped around two dark instrument
@@ -20,6 +20,10 @@
 }
 
 :root {
+  /* This shell is a deliberate light design. Declaring the scheme stops Chrome's
+     Auto Dark Mode from inverting it after first paint (the black/white reload flicker). */
+  color-scheme: light;
+
   /* One cool-slate hue family (~215°) for every surface and line. */
   --bg: #f4f6f9;
   --bg-2: #eaeef4;
@@ -456,6 +460,14 @@ section::-webkit-scrollbar-thumb {
 .item.accepted { opacity: 0.5; background: none; border-left-color: var(--accent-line); }
 .item.accepted .k { color: var(--accent); }
 
+.tech {
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.02em;
+  margin-top: 2px;
+}
+
 .empty {
   padding: 10px 18px;
   color: var(--dim);
@@ -607,6 +619,14 @@ button.tiny { padding: 4px 8px; font-size: 10.5px; font-weight: 500; }
   color: #f5f8fb;
 }
 .b-body { color: rgba(214, 225, 235, 0.9); max-width: 760px; font-size: 14px; line-height: 1.6; }
+.b-body.b-warn {
+  color: #fff;
+  font-weight: 600;
+  padding: 10px 14px;
+  background: rgba(184, 119, 10, 0.85);
+  border-radius: 6px;
+  box-shadow: 0 0 0 1px rgba(255, 190, 110, 0.5) inset;
+}
 .b-nav {
   color: rgba(180, 192, 205, 0.6);
   font-size: 10.5px;
@@ -632,6 +652,26 @@ button.tiny { padding: 4px 8px; font-size: 10.5px; font-weight: 500; }
   box-shadow: 0 0 0 1px rgba(255, 120, 110, 0.5) inset, 0 10px 30px -12px rgba(192, 57, 43, 0.9);
 }
 #unscaled-banner.on { display: block; }
+
+#no-route-banner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 4;
+  display: none;
+  padding: 10px;
+  text-align: center;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  font-size: 11px;
+  color: #fff;
+  background: rgba(184, 119, 10, 0.92);
+  border-radius: var(--r-panel) var(--r-panel) 0 0;
+  box-shadow: 0 0 0 1px rgba(255, 190, 110, 0.5) inset, 0 10px 30px -12px rgba(184, 119, 10, 0.9);
+}
+#no-route-banner.on { display: block; }
+#unscaled-banner.on ~ #no-route-banner.on { top: 40px; }
 
 @media (prefers-reduced-motion: reduce) {
   * { transition-duration: 1ms !important; }

@@ -17,6 +17,8 @@ export interface BriefStep {
   title: string;
   body: string;
   run: () => void;
+  /** True when this step is reporting a failure state, not a fact. Styled as a warning. */
+  warn?: boolean;
 }
 
 export class Briefing {
@@ -88,10 +90,14 @@ export class Briefing {
       },
       {
         title: 'Assigned route',
-        body: target
-          ? `Entry to ${target.name}: ${nDoors} doors. The route is the shortest path over the ` +
-            'room graph, where rooms are nodes and doorways are edges.'
-          : 'No target selected.',
+        body: !target
+          ? 'No target selected.'
+          : route
+            ? `Entry to ${target.name}: ${nDoors} doors. The route is the shortest path over the ` +
+              'room graph, where rooms are nodes and doorways are edges.'
+            : `NO ROUTE to ${target.name}. The room graph is disconnected between the entry and ` +
+              'this space — no door or stair links them. Do not brief this path; verify the plan first.',
+        warn: !!target && !route,
         run: () => {
           for (const s of this.site.storeys) V.setStoreyVisible(s.id, true);
           V.setRoofVisible(false);
@@ -151,6 +157,7 @@ export class Briefing {
     this.el.step.textContent = `${this.index + 1} / ${this.steps.length}`;
     this.el.title.textContent = s.title;
     this.el.body.textContent = s.body;
+    this.el.body.classList.toggle('b-warn', !!s.warn);
     s.run();
   }
 }

@@ -3,7 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Mayasabha — blueprint to tactical 3D</title>
+    <!-- Declared before the stylesheet loads, so Chrome's Auto Dark Mode never
+         inverts this deliberately-light shell on first paint. -->
+    <meta name="color-scheme" content="light" />
+    <title>NotMayasabha — blueprint to tactical 3D</title>
     <link rel="stylesheet" href="./src/ui/style.css" />
   </head>
   <body>
@@ -11,7 +14,7 @@
       <div class="brand">
         <span class="mark">▲</span>
         <div>
-          <div class="name">Mayasabha</div>
+          <div class="name">NotMayasabha</div>
           <div class="sub">2D blueprint → tactical 3D walkthrough · SIH1773 · NSG</div>
         </div>
       </div>
@@ -36,7 +39,7 @@
           <span>2D PLAN</span>
           <span class="storey-tabs" id="storey-tabs"></span>
         </div>
-        <canvas id="plan"></canvas>
+        <canvas id="plan" title="Scroll to zoom · double-click to reset"></canvas>
         <div id="plan-mode"></div>
 
         <div class="panel-head"><span>SCALE</span><span class="hint" id="scale-state"></span></div>
@@ -59,6 +62,7 @@
       <section id="centre">
         <div id="view3d"></div>
         <div id="unscaled-banner">UNSCALED MODEL — NOT FOR TACTICAL USE</div>
+        <div id="no-route-banner">NO ROUTE — SELECTED SPACES ARE DISCONNECTED</div>
         <div id="hud">
           <div id="hud-room">—</div>
           <div id="hud-help">Click <b>Walkthrough</b>, then WASD to move, mouse to look, Shift to run, Esc to release the pointer.</div>

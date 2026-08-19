@@ -1,4 +1,4 @@
-# Mayasabha — ARCHITECTURE
+# NotMayasabha — ARCHITECTURE
 
 **SIH1773 — Conversion of 2D Blueprints into 3D Model. National Security Guard, MHA.**
 

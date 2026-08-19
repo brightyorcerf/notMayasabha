@@ -26,6 +26,8 @@ const hex = (n: number, a = 1): string =>
 export class Plan2D {
   private ctx: CanvasRenderingContext2D;
   private k = 1; private ox = 0; private oy = 0;
+  /** User zoom on top of fit-to-bounds, and the pan it takes to keep the cursor anchored. */
+  private zoomFactor = 1; private panX = 0; private panY = 0;
   storeyId: string;
   route: Route | null = null;
   bridgeKeys = new Set<string>();
@@ -47,7 +49,29 @@ export class Plan2D {
     this.ctx = canvas.getContext('2d')!;
     this.storeyId = s.doc.storeys[0].id;
     canvas.addEventListener('click', (e) => this.click(e));
+    canvas.addEventListener('wheel', (e) => this.wheel(e), { passive: false });
+    canvas.addEventListener('dblclick', () => this.resetView());
     new ResizeObserver(() => this.draw()).observe(canvas);
+  }
+
+  /** Back to fit-to-bounds. Called on zoom reset and whenever the storey changes. */
+  resetView(): void {
+    this.zoomFactor = 1; this.panX = 0; this.panY = 0;
+    this.draw();
+  }
+
+  private wheel(e: WheelEvent): void {
+    e.preventDefault();
+    const r = this.canvas.getBoundingClientRect();
+    const px = (e.clientX - r.left) * (this.canvas.width / r.width);
+    const py = (e.clientY - r.top) * (this.canvas.height / r.height);
+    const ux = this.ux(px), uy = this.uy(py);
+    this.zoomFactor = Math.min(10, Math.max(1, this.zoomFactor * Math.exp(-e.deltaY * 0.001)));
+    this.fit();
+    // Re-anchor so the point under the cursor does not jump when the zoom changes.
+    this.panX += px - this.sx(ux);
+    this.panY += py - this.sy(uy);
+    this.draw();
   }
 
   private fit(): void {
@@ -59,9 +83,10 @@ export class Plan2D {
     }
     const pad = 1.2;
     const w = this.canvas.width, h = this.canvas.height;
-    this.k = Math.min(w / (maxX - minX + pad * 2), h / (maxY - minY + pad * 2));
-    this.ox = (w - (maxX - minX) * this.k) / 2 - minX * this.k;
-    this.oy = (h - (maxY - minY) * this.k) / 2 - minY * this.k;
+    const baseK = Math.min(w / (maxX - minX + pad * 2), h / (maxY - minY + pad * 2));
+    this.k = baseK * this.zoomFactor;
+    this.ox = (w - (maxX - minX) * this.k) / 2 - minX * this.k + this.panX;
+    this.oy = (h - (maxY - minY) * this.k) / 2 - minY * this.k + this.panY;
   }
 
   private sx(x: number): number { return x * this.k + this.ox; }

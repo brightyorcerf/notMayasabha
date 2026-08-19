@@ -122,7 +122,7 @@ algorithms for everything else.
 
 ## 4. RECOMMENDED ARCHITECTURE
 
-Working name suggestions: **Mayasabha**, **DRISHTI**, **PRAHAAR**. Pick one. Names help judges remember you.
+Working name suggestions: **NotMayasabha**, **DRISHTI**, **PRAHAAR**. Pick one. Names help judges remember you.
 
 ### 4.1 Principle
 

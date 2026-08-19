@@ -123,11 +123,11 @@ export function renderSelection(
       `<b>${r.name}</b><br>${r.use} · ${st.name}<br>` +
       `area: ${un ? 'UNAVAILABLE (unscaled)' : `${area.toFixed(1)} m²`}<br>` +
       `doors: ${n ? gr.adj.get(key)!.length : 0}` +
-      `${ap.has(key) ? ' · <b class="v-crit">CRITICAL ROOM</b>' : ''}<br>` +
-      `betweenness: ${(bc.get(key) ?? 0).toFixed(1)}<br>` +
+      `${ap.has(key) ? ' · <b class="v-crit">CRITICAL ROOM — cuts off other spaces if lost</b>' : ''}<br>` +
       `adjacent: ${nbrs.join(', ') || '—'}<br>` +
-      `<span class="k">confidence ${r.confidence.toFixed(2)} · origin ${r.origin} · ` +
-      `${r.verified ? 'verified' : 'NOT VERIFIED'}</span>`
+      `<div class="tech">technical: betweenness ${(bc.get(key) ?? 0).toFixed(1)} · ` +
+      `confidence ${r.confidence.toFixed(2)} · origin ${r.origin} · ` +
+      `${r.verified ? 'verified' : 'NOT VERIFIED'}</div>`
     );
   }
 
@@ -136,17 +136,17 @@ export function renderSelection(
   const e = gr.edges.find((x) => x.opening_id === o.id);
   const iso = e ? isolationOf(gr, e.key) : [];
   return (
-    `<b>${o.kind} ${o.id}</b><br>${e ? e.label : 'connects nothing'}<br>` +
+    `<b>${e ? e.label : `${o.kind} (connects nothing)`}</b><br>` +
     `width ${m(o.width_u * mpu)} · head ${o.head_m} m · swing ${o.swing}<br>` +
-    `${e && bridgesSet.has(e.key) ? '<b class="v-bad">BRIDGE — critical door</b><br>' : ''}` +
+    `${e && bridgesSet.has(e.key) ? '<b class="v-bad">ONLY WAY IN — critical door</b><br>' : ''}` +
     `${e && iso.length ? `sealing it isolates <b>${iso.length}</b> space(s): ` +
       `${iso.slice(0, 4).map((k) => gr.nodes.get(k)!.name).join(', ')}<br>` : ''}` +
-    `host wall ${w.id} · ${m(w.thickness_u * mpu)} · ${w.wall_class}<br>` +
     `breachable: <b>${w.breachable ? 'yes' : 'no'}</b>` +
     `${w.breach_origin ? ` <span class="k">(${w.breach_origin.toLowerCase()} judgement)</span>` : ''}<br>` +
     `${w.breach_note ? `<span class="k">${w.breach_note}</span><br>` : ''}` +
-    `<span class="k">confidence ${o.confidence.toFixed(2)} · origin ${o.origin} · ` +
-    `${o.verified ? 'verified' : 'NOT VERIFIED'}</span>`
+    `<div class="tech">technical: ${o.id} · host wall ${w.id} · ${m(w.thickness_u * mpu)} · ${w.wall_class} · ` +
+    `confidence ${o.confidence.toFixed(2)} · origin ${o.origin} · ` +
+    `${o.verified ? 'verified' : 'NOT VERIFIED'}</div>`
   );
 }
 

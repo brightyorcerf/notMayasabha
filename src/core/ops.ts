@@ -25,6 +25,18 @@ export const CORRECTIVE: ReadonlySet<OpKind> = new Set<OpKind>([
   'SET_SCALE', 'CLEAR_SCALE', 'SET_WALL_PROPS', 'SET_ROOM', 'SET_ENTRY', 'SET_EXIT',
 ]);
 
+/**
+ * The only legal status transitions. DRAFT -> REVIEWED -> LOCKED, forward only.
+ * No status reaches LOCKED except through REVIEWED, and nothing reaches TAMPERED
+ * through an Op — that state is computed live from `verifyChain()`, never written.
+ */
+const LEGAL_STATUS_TRANSITIONS: Record<SiteDocument['status'], ReadonlySet<SiteDocument['status']>> = {
+  DRAFT: new Set(['REVIEWED']),
+  REVIEWED: new Set(['LOCKED']),
+  LOCKED: new Set([]),
+  TAMPERED: new Set([]),
+};
+
 export interface Op {
   seq: number;
   ts: string;
@@ -137,8 +149,13 @@ export function apply(doc: SiteDocument, op: Op): SiteDocument {
       break;
     }
     case 'SET_STATUS': {
-      d.status = P.status as SiteDocument['status'];
-      for (const st of d.storeys) st.status = (P.status === 'TAMPERED' ? 'DRAFT' : P.status) as Storey_status;
+      const next = P.status as SiteDocument['status'];
+      const legal = LEGAL_STATUS_TRANSITIONS[d.status];
+      if (!legal.has(next)) {
+        throw new Error(`Illegal status transition: ${d.status} -> ${next}`);
+      }
+      d.status = next;
+      for (const st of d.storeys) st.status = next as Storey_status;
       break;
     }
   }

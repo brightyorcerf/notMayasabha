@@ -15,11 +15,11 @@ This is a requirements check, not a design document.
 | ¶3 | Input length, breadth, height | Manual parameter panel (patch item 13) | **COVERED** |
 | ¶3 | Input **layout of staircase** | Stair objects exist; no explicit input path | **GAP** — see G2 |
 | ¶3 | Input entry and exit | `SET_ENTRY`, briefing entry/exit points | **COVERED** |
-| ¶3 | "export them to a file" | `.sitepkg` (encrypted) + GLB | **COVERED** — but must be *named* as the export step in the demo |
+| ¶3 | "export them to a file" | GLB export + `ops.jsonl` audit log | **PARTIAL** — encrypted `.sitepkg` is designed but not built this week; see `architecture.md` §9. GLB is the file a commander actually gets |
 | ¶3 | Full-fledged 3D walkthrough model | Geometry generator + walkthrough | **COVERED** |
 | ¶3 / ¶6(d) | Integration of the exported model with offline maps and satellite imagery | Georeference + basemap underlay | **PARTIAL** — see G3 |
 | ¶4 | Fully standalone, zero internet after install | Kill-switch + import lint + area pack | **STRONG** |
-| ¶4 | Install-time internet to fetch maps and imagery **"from open source"** | Install-time asset layer | **STRONG** — see §3 |
+| ¶4 | Install-time internet to fetch maps and imagery **"from open source"** | Install-time asset layer | **DEFERRED** — the fetcher itself is not built; the area pack is hand-authored and bundled at build time. The kill-switch that enforces zero internet *after* install (row above) is what's STRONG. See `architecture.md` §7.1 |
 | ¶5 | "reduce the time taken during the initial briefing" | Correction-time metrics only | **GAP** — see G4 |
 | ¶6(a) | Blueprint in, 3D walkthrough out | Full pipeline | **COVERED** |
 | ¶6(b) | Provisions to input parameters | Parameter panel | **COVERED** |

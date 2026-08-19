@@ -13,6 +13,7 @@ import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockCont
 import type { SiteMeshes } from '../geometry/build3d';
 import type { Grid } from '../core/grid';
 import type { SiteDocument, Stair } from '../core/types';
+import { frameBox as fitFrame } from './framing';
 
 const EYE_M = 1.6;
 const BODY_R = 0.28;
@@ -54,6 +55,9 @@ export class Viewer {
   private lookTarget = new THREE.Vector3();
   onRoomEnter: ((roomId: string | null) => void) | null = null;
   private lastRoom: string | null = null;
+  /** Exterior wall materials, de-duplicated. X-ray mode reaches through these. */
+  private extWallMats = new Set<THREE.MeshStandardMaterial>();
+  private xray = false;
 
   constructor(
     private el: HTMLElement,
@@ -73,6 +77,9 @@ export class Viewer {
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    // Filmic response instead of a linear clamp: stops the concrete reading as flat grey.
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.15;
     el.appendChild(this.renderer.domElement);
 
     this.scene.background = new THREE.Color(0x0d1117);
@@ -93,6 +100,10 @@ export class Viewer {
     sun.shadow.camera.far = 160;
     this.scene.add(sun);
     this.scene.add(sun.target);
+    // Cool fill from the opposite side. Without it every unlit wall is the same grey.
+    const fill = new THREE.DirectionalLight(0x9db8ff, 0.42);
+    fill.position.set(-32, 18, -26);
+    this.scene.add(fill);
 
     const ground = new THREE.Mesh(
       new THREE.PlaneGeometry(600, 600),
@@ -112,11 +123,23 @@ export class Viewer {
     this.world.scale.set(this._mpu, 1, this._mpu);
     this.scene.add(this.world);
 
+    for (const sm of meshes.storeys.values()) {
+      const mat = sm.walls.material;
+      if (mat instanceof THREE.MeshStandardMaterial) this.extWallMats.add(mat);
+    }
+
     const c = meshes.bounds.getCenter(new THREE.Vector3());
     this.orbit = new OrbitControls(this.camera, this.renderer.domElement);
     this.orbit.target.copy(c);
     this.orbit.enableDamping = true;
     this.orbit.maxPolarAngle = Math.PI * 0.495;
+    // Map-style handling: the wheel zooms toward the cursor, not the orbit centre,
+    // and the dolly is clamped so you cannot fall inside a wall or lose the building.
+    this.orbit.zoomToCursor = true;
+    this.orbit.minDistance = 2.5;
+    this.orbit.maxDistance = 220;
+    this.orbit.panSpeed = 0.9;
+    this.orbit.zoomSpeed = 0.9;
     this.orbit.update();
 
     this.lock = new PointerLockControls(this.camera, this.renderer.domElement);
@@ -162,6 +185,7 @@ export class Viewer {
     this.fly = null;
     this.path = null;
     this.orbit.enabled = false;
+    this.setXray(this.xray);
     this.currentBase = this.baseNear(0);
     this.camera.position.set(x, this.currentBase + EYE_M, z);
     if (yawTo) this.camera.lookAt(yawTo.x, this.currentBase + EYE_M, yawTo.z);
@@ -172,6 +196,58 @@ export class Viewer {
     this.mode = 'ORBIT';
     this.orbit.enabled = true;
     if (this.lock.isLocked) this.lock.unlock();
+    this.setXray(this.xray);
+  }
+
+  /**
+   * X-ray the exterior shell. In the doll-house this is the difference between
+   * looking at a grey box and reading the floor plan in three dimensions.
+   * Forced off in the walkthrough: from inside, a see-through wall is a lie.
+   */
+  setXray(on: boolean): void {
+    this.xray = on;
+    const live = on && this.mode === 'ORBIT';
+    for (const m of this.extWallMats) {
+      m.transparent = live;
+      m.opacity = live ? 0.22 : 1;
+      m.depthWrite = !live;
+      m.needsUpdate = true;
+    }
+  }
+
+  get xrayOn(): boolean { return this.xray; }
+
+  /** Move the camera so `box` fills the view. The one framing primitive. */
+  frameBox(box: THREE.Box3, ms = 900): void {
+    if (box.isEmpty()) return;
+    const f = fitFrame(box, this.camera.fov, this.camera.aspect);
+    this.flyTo(f.pos, f.look, ms);
+  }
+
+  /** Frame the whole building. This is the reset-view button. */
+  fitAll(ms = 900): void {
+    this.frameBox(new THREE.Box3().setFromObject(this.meshes.root), ms);
+  }
+
+  /** Frame a set of world-space points, e.g. every leg of a computed route. */
+  framePoints(points: THREE.Vector3[], ms = 900): void {
+    if (points.length === 0) return;
+    const box = new THREE.Box3();
+    for (const p of points) box.expandByPoint(p);
+    box.expandByScalar(3.5);
+    this.frameBox(box, ms);
+  }
+
+  /** Dolly by a factor along the view axis. Drives the on-screen zoom buttons. */
+  zoomBy(factor: number): void {
+    if (this.mode !== 'ORBIT') return;
+    const t = this.orbit.target;
+    const v = new THREE.Vector3().subVectors(this.camera.position, t);
+    const len = THREE.MathUtils.clamp(
+      v.length() * factor, this.orbit.minDistance, this.orbit.maxDistance,
+    );
+    this.camera.position.copy(t).add(v.setLength(len));
+    this.orbit.update();
   }
 
   private baseNear(y: number): number {

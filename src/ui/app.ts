@@ -10,25 +10,24 @@
 import * as THREE from 'three';
 import { loadDoc, statusGate } from '../core/site';
 import { Session } from '../core/session';
-import { unscaledRecord, calibrationMpu, runChecks, stateFromChecks } from '../core/scale';
 import { health } from '../core/netguard';
-import { FACTOR_FIXES } from '../core/scale';
 import { buildSiteMeshes } from '../geometry/build3d';
 import {
-  buildRoomGraph, bridges, articulationPoints, route as findRoute, betweenness,
-  OUTSIDE, nodeKey, type Route, type RoomGraph,
+  buildRoomGraph, bridges, articulationPoints, betweenness,
+  nodeKey, type RoomGraph,
 } from '../analysis/graph';
 import { Viewer } from '../view3d/viewer';
 import { Overlays } from '../view3d/overlays';
 import { Plan2D, type PlanSelection } from '../view2d/plan';
 import { loadPack, buildNeighbourhood } from '../geo/neighbourhood';
 import { Briefing } from './briefing';
-import { exportGLB } from './exportGlb';
+import { installScalePanel } from './scalePanel';
+import { installRouting } from './routing';
+import { installBriefingExport } from './briefingExport';
 import {
   renderScale, renderFindings, renderGateHint, renderOps, renderMetrics,
   renderSelection, renderParams,
 } from './panels';
-import type { ScaleRecord } from '../core/types';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string): T => document.getElementById(id) as T;
 
@@ -52,11 +51,9 @@ export function start(): void {
     wrap: $('briefing'), step: $('b-step'), title: $('b-title'), body: $('b-body'),
   });
 
-  let currentRoute: Route | null = null;
-  let targetKey: string | null = null;
   let selection: PlanSelection | null = null;
-  /** Two-click calibration state. */
-  let calibrating: Array<[number, number]> = [];
+  /** Live reference the extracted panels read from; app.ts mutates it in place. */
+  const A = { gr, br, ap, bc };
 
   // ------------------------------------------------------------------ refresh
   const rebuildAnalysis = (): void => {
@@ -64,6 +61,7 @@ export function start(): void {
     br = bridges(gr);
     ap = articulationPoints(gr);
     bc = betweenness(gr);
+    A.gr = gr; A.br = br; A.ap = ap; A.bc = bc;
     plan.bridgeKeys = br;
     plan.criticalRooms = ap;
     overlays.applyDoorRoles(gr, br);
@@ -105,88 +103,22 @@ export function start(): void {
     ($('btn-lock') as HTMLButtonElement).disabled = S.doc.status !== 'REVIEWED';
     ($('btn-undo') as HTMLButtonElement).disabled = !S.canUndo;
 
-    wireScalePanel();
+    scalePanel.rewire();
     wireFindings();
     plan.draw();
   };
 
-  S.on(() => { rebuildAnalysis(); refresh(); if (currentRoute) showRoute(); });
+  const scalePanel = installScalePanel(S, plan);
 
-  // ------------------------------------------------------------------ scale
-  const scaleRecord = (mpu: number, p0: [number, number], p1: [number, number], real: number): ScaleRecord => {
-    const rec: ScaleRecord = {
-      state: 'VALIDATED',
-      meters_per_unit: mpu,
-      method: 'CALIBRATION_SEGMENT',
-      calibration: { p0, p1, real_length_m: real },
-      checks: [],
-      evidence: [{ text: `${real} m`, unit: 'm', measured_u: Math.hypot(p1[0] - p0[0], p1[1] - p0[1]), mpu }],
-      dispersion: 0,
-      confidence: 0.95,
-      set_by: 'USER',
-      set_at: new Date().toISOString(),
-    };
-    rec.checks = runChecks(S.doc, S.derived.grids, mpu);
-    rec.state = stateFromChecks(mpu, rec.checks);
-    return rec;
-  };
+  S.on(() => { rebuildAnalysis(); refresh(); if (routing.currentRoute) routing.showRoute(); });
 
-  function wireScalePanel(): void {
-    const cal = document.getElementById('btn-calibrate');
-    if (cal) {
-      cal.onclick = () => {
-        calibrating = [];
-        plan.calibrating = true;
-        $('plan-mode').innerHTML =
-          '<div class="mode">CALIBRATE — click the two ends of a run you know the real length of.</div>';
-        plan.draw();
-      };
-    }
-    const clr = document.getElementById('btn-clear-scale');
-    if (clr) {
-      clr.onclick = () =>
-        S.do('CLEAR_SCALE', [], { scale: unscaledRecord(new Date().toISOString()) },
-          'operator cleared the scale');
-    }
-    document.querySelectorAll<HTMLElement>('[data-fix]').forEach((n) => {
-      n.onclick = () => {
-        const f = FACTOR_FIXES[Number(n.dataset.fix)];
-        const base = S.doc.scale.meters_per_unit ?? S.derived.mpu;
-        const mpu = base * f.factor;
-        const cal2 = S.doc.scale.calibration;
-        const rec = scaleRecord(
-          mpu,
-          cal2?.p0 ?? [0, 0],
-          cal2?.p1 ?? [1, 0],
-          (cal2?.real_length_m ?? 1) * f.factor,
-        );
-        rec.method = S.doc.scale.method ?? 'MANUAL_BBOX';
-        S.do('SET_SCALE', [], { scale: rec }, `factor fix ${f.label}`);
-      };
-    });
-  }
-
-  plan.onCalibrationPoint = (x, y) => {
-    calibrating.push([x, y]);
-    if (calibrating.length < 2) {
-      $('plan-mode').innerHTML = '<div class="mode">CALIBRATE — now click the second point.</div>';
-      return;
-    }
-    const [p0, p1] = calibrating as [[number, number], [number, number]];
-    plan.calibrating = false;
-    $('plan-mode').innerHTML =
-      `<div class="mode">Real length of that run, in metres:
-        <input id="cal-len" type="number" step="0.01" value="20" />
-        <button id="cal-ok">Set scale</button></div>`;
-    $('cal-ok').onclick = () => {
-      const real = Number(($('cal-len') as HTMLInputElement).value);
-      const mpu = calibrationMpu(p0, p1, real);
-      $('plan-mode').innerHTML = '';
-      if (mpu === null) return;
-      S.do('SET_SCALE', [], { scale: scaleRecord(mpu, p0, p1, real) },
-        `calibration segment, ${real} m`);
-    };
-  };
+  // There is no persistence path by design (CLAUDE.md forbids localStorage). A refresh
+  // mid-review would silently erase the whole op log with no way back.
+  addEventListener('beforeunload', (e) => {
+    if (S.ops.length === 0) return;
+    e.preventDefault();
+    e.returnValue = '';
+  });
 
   // ------------------------------------------------------------------ findings
   function wireFindings(): void {
@@ -201,8 +133,15 @@ export function start(): void {
     });
   }
 
-  $('btn-review').onclick = () => S.do('SET_STATUS', [], { status: 'REVIEWED' }, 'operator marked REVIEWED');
-  $('btn-lock').onclick = () => S.do('SET_STATUS', [], { status: 'LOCKED' }, 'operator locked the document');
+  $('btn-review').onclick = () => {
+    const gate = statusGate(S.doc, S.derived.findings, new Set(S.accepted.keys()));
+    if (S.doc.status !== 'DRAFT' || !gate.canReachReviewed) return;
+    S.do('SET_STATUS', [], { status: 'REVIEWED' }, 'operator marked REVIEWED');
+  };
+  $('btn-lock').onclick = () => {
+    if (S.doc.status !== 'REVIEWED') return;
+    S.do('SET_STATUS', [], { status: 'LOCKED' }, 'operator locked the document');
+  };
   $('btn-undo').onclick = () => S.undo();
 
   // ------------------------------------------------------------------ net badge
@@ -215,6 +154,7 @@ export function start(): void {
       `<div class="kv"><span>Outbound sockets</span><b>${health.external}</b></div>` +
       `<div class="kv"><span>Loopback (own UI)</span><b>${health.loopback}</b></div>` +
       `<div class="kv"><span>Model, area pack</span><b>bundled at build</b></div>` +
+      `<div class="kv"><span>Perception</span><b>DEFERRED — every element below is HUMAN origin</b></div>` +
       (log.length
         ? log.map((a) => `<div class="item"><div class="k">${a.api} · ${a.loopback ? 'loopback, allowed' : 'BLOCKED'}</div>${a.url.slice(0, 44)}</div>`).join('')
         : '<div class="empty">No network call has been attempted since start.</div>');
@@ -230,6 +170,7 @@ export function start(): void {
     b.className = st.id === plan.storeyId ? 'on' : '';
     b.onclick = () => {
       plan.storeyId = st.id;
+      plan.resetView();
       tabs.querySelectorAll('button').forEach((x) => x.classList.remove('on'));
       b.classList.add('on');
       plan.draw();
@@ -241,80 +182,15 @@ export function start(): void {
   };
 
   // ------------------------------------------------------------------ routing
-  const fromSel = $<HTMLSelectElement>('sel-from');
-  const toSel = $<HTMLSelectElement>('sel-to');
-  const fillPickers = (): void => {
-    const opts = [...gr.nodes.values()]
-      .map((n) => `<option value="${n.key}">${n.key === OUTSIDE ? 'Exterior (entry point)' : `L${n.level} · ${n.name}`}</option>`)
-      .join('');
-    const a = fromSel.value, b = toSel.value;
-    fromSel.innerHTML = opts;
-    toSel.innerHTML = opts;
-    fromSel.value = a || OUTSIDE;
-    const server = [...gr.nodes.values()].find((n) => n.name === 'Server Room');
-    toSel.value = b || (server ? server.key : [...gr.nodes.keys()][1]);
-  };
-
-  function showRoute(): void {
-    const r = findRoute(gr, fromSel.value, toSel.value);
-    currentRoute = r;
-    targetKey = toSel.value;
-    plan.route = r;
-    plan.targetKey = targetKey;
-    overlays.markTarget(gr, targetKey);
-    if (r) {
-      overlays.drawRoute(gr, r);
-      $('route-out').innerHTML =
-        `<div class="route-hdr">${r.doors} doors · ${r.nodes.length} spaces</div>` +
-        r.nodes.map((k, i) => {
-          const n = gr.nodes.get(k)!;
-          const e = r.edges[i - 1];
-          const via = e
-            ? ` <span class="k">via ${e.kind === 'STAIR' ? 'stair' : e.opening_id}${br.has(e.key) ? ' · BRIDGE' : ''}</span>`
-            : '';
-          return `<div class="route-line"><span class="step">${String(i + 1).padStart(2, '0')}</span> ${n.name}${via}</div>`;
-        }).join('');
-    } else {
-      overlays.clearRoute();
-      $('route-out').innerHTML = '<div class="empty">No route. The graph is disconnected between those two spaces.</div>';
-    }
-    plan.draw();
-  }
-  $('btn-route').onclick = showRoute;
-  fromSel.onchange = showRoute;
-  toSel.onchange = showRoute;
-
-  $('btn-save-route').onclick = () => {
-    if (!currentRoute) return;
-    const legs = new Map<string, Array<[number, number]>>();
-    for (let i = 0; i < currentRoute.nodes.length; i++) {
-      const n = gr.nodes.get(currentRoute.nodes[i]);
-      if (n?.room_id) {
-        const arr = legs.get(n.storey_id) ?? [];
-        arr.push(n.centre_u);
-        legs.set(n.storey_id, arr);
-      }
-      const e = currentRoute.edges[i];
-      if (e) {
-        const arr = legs.get(e.storey_id) ?? [];
-        arr.push(e.point_u);
-        legs.set(e.storey_id, arr);
-      }
-    }
-    const to = gr.nodes.get(toSel.value)!;
-    S.do('ADD_ROUTE', [`route-${toSel.value}`], {
-      name: `Entry to ${to.name}`, team: 'ALPHA', color: '#00e5ff',
-      from_key: fromSel.value, to_key: toSel.value,
-      legs: [...legs].map(([storey_id, points_u]) => ({ storey_id, points_u })),
-    }, `saved route: entry to ${to.name}`);
-  };
+  const routing = installRouting(S, plan, overlays, A);
 
   // ------------------------------------------------------------------ analysers
   const renderAnalysers = (): void => {
     const bridgeEdges = gr.edges.filter((e) => br.has(e.key));
     $('bridges').innerHTML = bridgeEdges.length
       ? bridgeEdges.map((e) => `<div class="item bridge" data-door="${e.opening_id ?? ''}" data-storey="${e.storey_id}">
-          <div class="k">${e.kind === 'STAIR' ? 'STAIR' : e.opening_id}</div>${e.label}</div>`).join('')
+          <b>${e.label}</b><br>${e.kind === 'STAIR' ? 'stairway — the only link between these floors' : 'the only door between these spaces'}
+          <div class="tech">technical: ${e.kind === 'STAIR' ? e.stair_id : e.opening_id}</div></div>`).join('')
       : '<div class="empty">No bridges. Every space has a second way in.</div>';
     $('bridges').querySelectorAll<HTMLElement>('[data-door]').forEach((n) => {
       n.onclick = () => {
@@ -326,7 +202,8 @@ export function start(): void {
     crit.sort((a, b) => (bc.get(b.key) ?? 0) - (bc.get(a.key) ?? 0));
     $('critical').innerHTML = crit.length
       ? crit.map((n) => `<div class="item crit" data-room="${n.room_id}" data-storey="${n.storey_id}">
-          <div class="k">betweenness ${(bc.get(n.key) ?? 0).toFixed(1)} · ${gr.adj.get(n.key)!.length} doors</div>${n.name}</div>`).join('')
+          <b>${n.name}</b><br>losing this room cuts off other spaces — ${gr.adj.get(n.key)!.length} doors
+          <div class="tech">technical: betweenness ${(bc.get(n.key) ?? 0).toFixed(1)}</div></div>`).join('')
       : '<div class="empty">No articulation points.</div>';
     $('critical').querySelectorAll<HTMLElement>('[data-room]').forEach((n) => {
       n.onclick = () => select({ kind: 'room', storeyId: n.dataset.storey!, id: n.dataset.room! });
@@ -384,7 +261,7 @@ export function start(): void {
       });
     } else {
       const n = gr.nodes.get(nodeKey(sel.storeyId, sel.id));
-      add('Set as target', () => { toSel.value = nodeKey(sel.storeyId, sel.id); showRoute(); });
+      add('Set as target', () => { routing.toSel.value = nodeKey(sel.storeyId, sel.id); routing.showRoute(); });
       add('Threat marker', () => {
         if (!n) return;
         const label = prompt('Marker label:', 'Suspect last seen') ?? '';
@@ -462,54 +339,17 @@ export function start(): void {
     plan.draw();
   }, 120);
 
-  // ------------------------------------------------------------------ briefing
-  $('btn-brief').onclick = () => {
-    brief.mpu = viewer.mpu;
-    brief.build(gr, currentRoute, targetKey, br, ap);
-    brief.start();
-  };
-  addEventListener('keydown', (e) => {
-    if (!brief.active) return;
-    if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); brief.next(); }
-    if (e.key === 'ArrowLeft') { e.preventDefault(); brief.prev(); }
-    if (e.key === 'Escape') brief.stop();
-  });
-
-  // ------------------------------------------------------------------ export
-  $('btn-export').onclick = async () => {
-    const gate = statusGate(S.doc, S.derived.findings, new Set(S.accepted.keys()));
-    if (!gate.exportAllowed) return;
-    const btn = $<HTMLButtonElement>('btn-export');
-    btn.disabled = true;
-    btn.textContent = 'Exporting…';
-    try {
-      const bytes = await exportGLB(viewer.world, `Mayasabha-${S.doc.doc_id}-${S.derived.hash}.glb`);
-      btn.textContent = `GLB ${(bytes / 1e6).toFixed(1)} MB`;
-    } catch (err) {
-      btn.textContent = 'Export failed';
-      console.error(err);
-    }
-    setTimeout(() => { btn.textContent = 'Export GLB'; refresh(); }, 2500);
-  };
-
-  $('btn-export-ops').onclick = () => {
-    const blob = new Blob([S.opsJsonl], { type: 'application/x-ndjson' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `ops-${S.doc.doc_id}.jsonl`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 4000);
-  };
+  // ------------------------------------------------------------------ briefing + export
+  installBriefingExport(S, brief, viewer, A, routing, refresh);
 
   // ------------------------------------------------------------------ boot
   rebuildAnalysis();
-  fillPickers();
+  routing.fillPickers();
   renderAnalysers();
   refresh();
   refreshNet();
-  showRoute();
-  S.on(() => { fillPickers(); renderAnalysers(); if (selection) {
+  routing.showRoute();
+  S.on(() => { routing.fillPickers(); renderAnalysers(); if (selection) {
     $('selection').innerHTML = renderSelection(S, gr, br, ap, bc, selection.kind, selection.storeyId, selection.id);
   } });
 }

@@ -84,6 +84,7 @@ s.do('SET_SCALE', [], {
     calibration: { p0: [0, 0], p1: [20, 0], real_length_m: 20 }, checks: [], evidence: [],
     dispersion: 0, confidence: 1, set_by: 'USER', set_at: new Date().toISOString() },
 }, 'calibrate 20 m');
+s.do('SET_STATUS', [], { status: 'REVIEWED' }, 'review');
 s.do('SET_STATUS', [], { status: 'LOCKED' }, 'lock');
 const m = s.metrics;
 console.log(`  ops=${m.total_ops} corrective=${m.corrective_ops} correction_density=${m.correction_density.toFixed(4)} verified=${(m.verified_fraction * 100).toFixed(0)}%`);

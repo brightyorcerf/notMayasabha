@@ -55,10 +55,11 @@ export class Session {
       dt_ms: Math.min(now - this.lastOpAt, 30_000),
       label,
     };
+    const next = apply(this.doc, op);
     this.lastOpAt = now;
     this.undoStack.push(this.doc);
     if (this.undoStack.length > UNDO_DEPTH) this.undoStack.shift();
-    this.doc = apply(this.doc, op);
+    this.doc = next;
     this.ops.push(op);
     if (kind === 'ACCEPT_WARNING') {
       this.accepted.set(String(payload.finding_id), String(payload.reason ?? ''));

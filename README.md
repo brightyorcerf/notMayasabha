@@ -1,4 +1,4 @@
-# Mayasabha
+# NotMayasabha
 
 **A 2D building blueprint becomes an offline, correctable, tactical 3D walkthrough.
 A commander can brief an assault team in minutes, on an air-gapped laptop.**

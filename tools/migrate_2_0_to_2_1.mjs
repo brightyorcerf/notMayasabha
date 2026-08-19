@@ -136,7 +136,7 @@ const out = {
   briefing: { entry_points: entries, exit_points: exits, routes: [], markers: [] },
   provenance: {
     created_by: 'hand-authored',
-    tool: 'Mayasabha',
+    tool: 'NotMayasabha',
     tool_version: '0.1.0',
     source_files: [],
   },
