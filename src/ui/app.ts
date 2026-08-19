@@ -94,14 +94,19 @@ export function start(): void {
     $('metrics').innerHTML = renderMetrics(S);
     $('chain-state').textContent = S.verifyChain() ? 'chain intact' : 'TAMPERED';
 
+    // The uninterruptible walkthrough owns the camera while it plays, so nothing that
+    // would take the camera or change the route may re-enable itself underneath it.
+    const held = viewer.cinematicLocked;
     ($('btn-export') as HTMLButtonElement).disabled = !gate.exportAllowed;
-    ($('btn-brief') as HTMLButtonElement).disabled = !gate.briefingAllowed;
+    ($('btn-brief') as HTMLButtonElement).disabled = !gate.briefingAllowed || held;
     $('btn-brief').title = gate.briefingAllowed
       ? 'Step through the briefing'
       : 'Briefing requires a LOCKED document. Clear the gate first.';
     ($('btn-review') as HTMLButtonElement).disabled = !gate.canReachReviewed || S.doc.status !== 'DRAFT';
     ($('btn-lock') as HTMLButtonElement).disabled = S.doc.status !== 'REVIEWED';
     ($('btn-undo') as HTMLButtonElement).disabled = !S.canUndo;
+    ($('btn-walk') as HTMLButtonElement).disabled = held;
+    ($('btn-orbit') as HTMLButtonElement).disabled = held;
 
     scalePanel.rewire();
     wireFindings();
@@ -182,7 +187,16 @@ export function start(): void {
   };
 
   // ------------------------------------------------------------------ routing
-  const routing = installRouting(S, plan, overlays, A);
+  const routing = installRouting(S, plan, overlays, A, viewer);
+  // Mirrors the viewer's camera lock into the controls outside the tactical panel. The
+  // viewer already refuses these commands while locked; disabling them is so the operator
+  // can see that, rather than clicking a live-looking button that does nothing.
+  routing.onPlaybackChange = (playing) => {
+    for (const id of ['btn-brief', 'btn-walk', 'btn-orbit']) {
+      ($(id) as HTMLButtonElement).disabled = playing;
+    }
+    if (!playing) refresh();
+  };
 
   // ------------------------------------------------------------------ analysers
   const renderAnalysers = (): void => {

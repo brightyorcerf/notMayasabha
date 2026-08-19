@@ -6,7 +6,7 @@
     <!-- Declared before the stylesheet loads, so Chrome's Auto Dark Mode never
          inverts this deliberately-light shell on first paint. -->
     <meta name="color-scheme" content="light" />
-    <title>NotMayasabha — blueprint to tactical 3D</title>
+    <title>notMayasabha: 2d to 3d</title>
     <link rel="stylesheet" href="./src/ui/style.css" />
   </head>
   <body>
@@ -87,9 +87,12 @@
         </div>
         <div class="row">
           <button id="btn-route" class="wide">Compute route</button>
-          <button id="btn-save-route">Save to briefing</button>
         </div>
         <div id="route-out"></div>
+        <div class="row" id="route-actions">
+          <button id="btn-walk-route" disabled>Animated walkthrough</button>
+          <button id="btn-save-route">Save to briefing</button>
+        </div>
 
         <div class="panel-head"><span>CRITICAL DOORS <em>(bridges)</em></span></div>
         <div id="bridges"></div>

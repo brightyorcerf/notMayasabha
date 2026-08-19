@@ -516,6 +516,8 @@ button.tiny { padding: 4px 8px; font-size: 10.5px; font-weight: 500; }
 
 #status-row { gap: 7px; }
 #status-row button { flex: 1; }
+#route-actions { gap: 7px; }
+#route-actions button { flex: 1; }
 #sel-actions { flex-wrap: wrap; gap: 5px; }
 #sel-actions button { font-size: 11px; padding: 5px 9px; }
 

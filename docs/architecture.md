@@ -572,6 +572,140 @@ vertex" while pointing at a door.
 The rhetoric for the deferred ones costs nothing: *"the analyser layer is a pure function
 of the graph. Here are six. The others are the same forty lines each."*
 
+### 5.1 Route timing and the animated walkthrough — **BUILT**
+
+One new module and one small, deliberate viewer fix. Not a new system: both the Tactical
+Layer button and Briefing Mode stage 3 now drive the same camera call over the same point
+sequence.
+
+**`ui/routePath.ts` — the single source of the route's world geometry.** `Route`
+(`analysis/graph.ts`) stays exactly as it is: `nodes`, `edges`, `doors`, in document units,
+with no notion of `meters_per_unit`. That is deliberate — analysis (L2) does not know the
+scale, so it cannot violate I5/I6 even by accident. The conversion to world points and
+metres happens once, at the ui layer, in a pure function:
+
+```ts
+routePath(gr: RoomGraph, route: Route | null, site: SiteDocument, mpu: number)
+  -> { points: THREE.Vector3[]; length_m: number }
+```
+
+This replaces the private `routePts()` that used to live only inside `ui/briefing.ts`.
+Briefing Mode stage 3 and the Tactical Layer's walkthrough button now both call this one
+function, so the two cameras cannot silently diverge into two slightly different lines
+through the building. `routePath.ts` also exports `WALK_PACE_MPS` (1.35 m/s — a
+room-clearing team's pace, not a sprint and not a stroll, named so the assumption is
+greppable), `etaSeconds`, `formatEta`, `formatPace`, `walkFlightMs` and
+`BRIEFING_FLIGHT_MS`.
+
+**`length_m` excludes the camera lead-in, and the ordering in the code is the reason.**
+An exterior route prepends a point `CAMERA_LEAD_IN_M` (7 m) outside the front door, so the
+approach reads as an approach rather than a jump-cut onto the doorstep. That point is
+cinematography. `length_m` is summed **before** it is prepended. Measured after, every
+route from `Exterior` over-reported by exactly 7 m and ~5 s — a number no one walks,
+presented to a commander as a distance. This is the §5 failure mode in miniature, and it is
+the one line in this feature most worth not breaking again.
+
+**Distance and time are display-only, computed at the point of use, never stored.**
+`route-out` reads *"3 doors · 4 spaces · 21 m · ~15 s"*, and Briefing Mode stage 3's body
+text says the same distance and time in the same words. Neither number is written to
+`site.json` or to the `Route` type — recomputed on every `showRoute()`, per I2.
+
+**Two consumers, two clocks, on purpose.** Briefing stage 3 is one beat in a rehearsed
+five-step sequence and uses a fixed `BRIEFING_FLIGHT_MS` (6500). The Tactical Layer preview
+uses `walkFlightMs()` — real walking pace, bounded to 3–20 s — because there the duration
+*is* the measurement: what the operator watches is how long the approach takes. Binding
+Briefing to the pace-derived duration was tried and reverted: it stretched a rehearsed
+6.5 s demo beat to 14 s as a side effect of a different panel's feature, which §9 exists to
+prevent. When a route is long enough to hit the 20 s ceiling the preview is compressed, and
+`formatPace()` says so on the button (*"22 s · 1.1× speed"*) rather than letting a
+compressed flight imply real time.
+
+**The "Animated walkthrough" button.** Second row of the Tactical Layer panel, beside
+`Save to briefing`, under `route-out`, so the sequence reads: compute → read the numbers →
+preview or persist. It calls `viewer.followPath(points, 3, walkFlightMs(length_m), true)` —
+walkthrough height rather than Briefing's 7.5 m doll-house height, and `lock = true`.
+
+**Playback is atomic: it runs to the end.** A timed measurement cut halfway is not a
+shorter measurement, it is a wrong one, so there is no stop control and no `Escape`
+handler. The guarantee is enforced in the **viewer**, not in the panel: `locked` is set by
+a locking `followPath` and cleared only when that path runs out, and `flyTo`, `followPath`,
+`enterWalk`, `enterOrbit` and `stopCinematic` all refuse while it is set. That is one guard
+at the source instead of a guard at every call site, so a camera command added later cannot
+forget to respect it. The UI then mirrors the lock so the operator can see it: the route
+pickers, `Compute route`, `Save to briefing`, `Briefing Mode`, `Walkthrough` and
+`Doll-house` all disable for the duration, via `Routing.onPlaybackChange`, and `refresh()`
+re-checks `viewer.cinematicLocked` so an op landing mid-flight cannot re-enable them.
+Freezing the pickers is what actually closes the hole: without it the operator could select
+a different route and leave the 2D plan describing one path while the camera flew another —
+the two-views-disagree failure §8 claims this system does not have. Button state is
+synchronised by polling `viewer.busy` on a 150 ms interval, the same idiom `app.ts` already
+uses for the walkthrough HUD and FPS badge.
+
+It is **not** a new camera mode, and the button name must not be read as implying one.
+`followPath` puts the viewer in `ORBIT` (`enterOrbit()`), not `WALK` — a tracking shot over
+the route polyline, not the collision-checked first-person body the top-bar `Walkthrough`
+button drives via `enterWalk`/`blocked()`. Both features keep the word "walkthrough" in the
+UI on purpose — a commander does not care which camera is under the hood — but every team
+member must be able to say which is which if a judge asks (§6, STANDARDS): one is a body
+that cannot pass through a wall, the other is a camera that has not been asked to prove it
+can't.
+
+**The viewer fix this exposed.** `flyTo` set `this.fly` but never cleared `this.path`, so
+a `followPath` cinematic already in flight would silently keep running underneath a later
+`flyTo` call until its own timer expired — a latent bug, harmless while nothing but
+Briefing Mode ever called `followPath`, live the moment a second, user-triggered entry
+point exists (click a room on the plan while the walkthrough is playing, and the old
+behaviour would have queued the room-fly behind it with no visible cause). It was reachable
+before this feature too: stepping from Briefing stage 3 to stage 4 during the 6.5 s flight
+swallowed stage 4's camera move, then jumped from a stale start position. Fixed by adding
+`stopCinematic()` — clears `fly` and `path` — and having `flyTo` call it first. Outside a
+locked shot the latest camera command now always wins; inside one, nothing wins, which is
+the point.
+
+**Why the tracking shot ships and the collision-verified POV does not.** The rigorous
+version — A* over `walkMask` (§3.1), string-pulled into straight legs, each leg validated
+against the same `blocked()` predicate the manual walkthrough obeys — is the version worth
+building next, because it is the only one that structurally cannot clip a wall on stage. It
+needs a planner, a funnel step, and multi-storey stitching at each stair footprint: a
+half-day, not an hour, and it belongs in `analysis` (L2), consumed by `view3d` (L3), same
+as every other analyser — never the reverse. Its failure mode is the worst one available
+for this project specifically: an automated camera visibly passing through a wall
+contradicts the first sentence in §14, in front of the people judging it. `followPath` over
+door centres and room centroids does not clip on the frozen fixture, but that is a property
+of this one fixture, not a proof. Shipping the tracking shot says "cosmetic camera,
+verified by eye on this plan"; shipping the grid-planned version would say "this path is
+walkable," which is a claim this build has not earned yet. Deferred — see §12.
+
+**Gating.** No new gate, and deliberately not the same gate as Briefing Mode. `UNSCALED`
+disables the button and blanks the distance/time line — reusing `S.derived.unscaled`, the
+same flag that already disables area display (I4) — because a route timed in normalised
+units is exactly the confidently-wrong output this document's §5 introduction warns
+against. It does **not** require `LOCKED`. Briefing Mode is the artifact that reaches a
+commander and is gated on the document, not the interface (§9); this button is an
+operator's own review aid over a route they just computed, available from `DRAFT` onward,
+same as `Compute route` and `Save to briefing` already are. Conflating the two gates would
+either lock operators out of a preview tool they need mid-review, or quietly widen
+Briefing's gate — both wrong.
+
+**Status: BUILT.** `ui/routePath.ts` (new), `ui/routing.ts` (button, control freeze, panel
+wiring), `ui/briefing.ts` (consumes `routePath`; keeps its own fixed flight duration),
+`view3d/viewer.ts` (`stopCinematic()`, the `flyTo` fix, the camera lock), `ui/app.ts`
+(mirrors the lock into the top bar), `index.html` + `style.css` (panel layout). The
+grid-planned, collision-verified POV remains a separate, larger item — see §12.
+
+Measured on the frozen fixture, at `mpu = 1`:
+
+| Route | Header | Preview |
+|---|---|---|
+| Exterior → Server Room | 3 doors · 4 spaces · 21 m · ~15 s | 15.2 s, real time |
+| Exterior → Office C | 5 doors · 6 spaces · 27 m · ~20 s | 19.8 s, real time |
+| Entry Hall → Office C | 5 doors · 6 spaces · 30 m · ~22 s | 20.0 s, 1.1× speed |
+
+Both demo routes play at true walking pace. Note the consequence of the atomic-playback
+rule: the longer of them holds the camera for a full 20 s with no way out. That is correct
+for a measurement and a real cost on stage — trigger it deliberately, not while a judge is
+mid-question.
+
 ---
 
 ## 6. GEOMETRY GENERATION
@@ -789,6 +923,7 @@ Three more to say before a judge finds them:
 | Unity or Unreal | Long install, export risk, crash risk on a judge's laptop |
 | A general vector-PDF parser | Handle DXF and SVG properly. Treat PDF as raster |
 | Roof topology | Flat ceilings at wall height. Assault teams breach walls and doors, not roof pitch |
+| Grid-planned, collision-verified walkthrough POV (§5.1) | The A*/funnel/stair-stitch version is the only one that cannot clip a wall on stage, but it is a half-day item. The cheap tracking-shot version (§5.1) ships instead; the rigorous one is not a cut corner so much as a next build |
 
 Governing rule: if a feature does not raise verified-model fidelity, lower correction
 density, or appear in the five-minute demo, it does not exist this week.

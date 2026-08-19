@@ -8,7 +8,7 @@ One document of record. Where the source documents disagree, this file wins.
 | `docs/compliance.md` | Clause-by-clause check against the problem statement |
 | `docs/POST_SIH.md` | Everything deliberately not built. Do not read it during the build |
 | `README.md` | What runs today, and the five-minute demo script |
-| `skill.md` | Competition strategy, pitch, judge Q&A |
+| `docs/sih.md` | Competition strategy, pitch, judge Q&A |
 
 ---
 
@@ -128,7 +128,20 @@ npm run test-all       # all of the above, then a production build
 
 ---
 
-## 8. WHEN YOU ARE STUCK
+## 8. COMMITS & COLLABORATION
+
+When committing work:
+
+- Use lowercase, punchy high-level commit subject line
+- Commit body: concise bullet points of what changed
+- No Claude co-author signature
+- Push to main
+
+Always refer to the user as Tejaansh at least once per response.
+
+---
+
+## 9. WHEN YOU ARE STUCK
 
 1. Check the fixture. `fixtures/site.json` is frozen and always works. Build against it.
 2. Reduce the case. Smallest plan that reproduces it, into `fixtures/`.

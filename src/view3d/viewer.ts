@@ -52,6 +52,8 @@ export class Viewer {
   private fpsAcc = 0;
   private fly: { from: THREE.Vector3; to: THREE.Vector3; fromLook: THREE.Vector3; toLook: THREE.Vector3; t: number; dur: number } | null = null;
   private path: { curve: THREE.CatmullRomCurve3; t: number; dur: number; height: number } | null = null;
+  /** Set by an uninterruptible `followPath`. Cleared only when that path runs out. */
+  private locked = false;
   private lookTarget = new THREE.Vector3();
   onRoomEnter: ((roomId: string | null) => void) | null = null;
   private lastRoom: string | null = null;
@@ -181,9 +183,9 @@ export class Viewer {
 
   /** Enter the walkthrough at a world point, facing a direction. */
   enterWalk(x: number, z: number, yawTo?: THREE.Vector3): void {
+    if (this.locked) return;
     this.mode = 'WALK';
-    this.fly = null;
-    this.path = null;
+    this.stopCinematic();
     this.orbit.enabled = false;
     this.setXray(this.xray);
     this.currentBase = this.baseNear(0);
@@ -193,6 +195,8 @@ export class Viewer {
   }
 
   enterOrbit(): void {
+    // `followPath` calls this before it takes the lock, so a locked shot never blocks its own setup.
+    if (this.locked) return;
     this.mode = 'ORBIT';
     this.orbit.enabled = true;
     if (this.lock.isLocked) this.lock.unlock();
@@ -347,8 +351,30 @@ export class Viewer {
     }
   }
 
-  /** Cinematic move. Used by Briefing Mode only. */
+  /**
+   * True while an uninterruptible tracking shot is playing. Every camera entry point below
+   * refuses while it is set, so the animation is atomic: no click, key or op can leave the
+   * camera flying one route while the panels describe another.
+   */
+  get cinematicLocked(): boolean { return this.locked; }
+
+  /**
+   * Cancel any in-flight cinematic move. A cancelled move is not a completed one, so
+   * nothing is notified — callers watch `busy` to learn when a move has ended.
+   * Refused during a locked shot: that shot ends only by running out.
+   */
+  stopCinematic(): void {
+    if (this.locked) return;
+    this.fly = null;
+    this.path = null;
+  }
+
+  /** Cinematic move. Used by Briefing Mode and room-click framing. */
   flyTo(pos: THREE.Vector3, look: THREE.Vector3, ms = 1600): void {
+    if (this.locked) return;
+    // A fresh camera command always wins over a stale one — without this, a `followPath`
+    // already in flight kept running underneath a later `flyTo` until its own timer ran out.
+    this.stopCinematic();
     this.enterOrbit();
     this.fly = {
       from: this.camera.position.clone(), to: pos.clone(),
@@ -357,15 +383,20 @@ export class Viewer {
     };
   }
 
-  /** Tracking shot along a polyline. Briefing Mode stage 3. */
-  followPath(points: THREE.Vector3[], height: number, ms: number): void {
-    if (points.length < 2) return;
+  /**
+   * Tracking shot along a polyline. Briefing Mode stage 3 plays an interruptible one, so a
+   * commander can step on through the sequence. The Tactical Layer's animated walkthrough
+   * plays a locked one: it is a timed measurement, and a measurement cut halfway is a lie.
+   */
+  followPath(points: THREE.Vector3[], height: number, ms: number, lock = false): void {
+    if (this.locked || points.length < 2) return;
+    this.stopCinematic();
     this.enterOrbit();
     this.path = {
       curve: new THREE.CatmullRomCurve3(points, false, 'catmullrom', 0.2),
       t: 0, dur: ms / 1000, height,
     };
-    this.fly = null;
+    this.locked = lock;
   }
 
   get busy(): boolean {
@@ -383,7 +414,7 @@ export class Viewer {
       this.camera.position.set(p.x + back.x, p.y + this.path.height, p.z + back.z);
       this.orbit.target.copy(ahead);
       this.camera.lookAt(ahead);
-      if (k >= 1) this.path = null;
+      if (k >= 1) { this.path = null; this.locked = false; }
     } else if (this.fly) {
       this.fly.t += dt;
       const k = Math.min(1, this.fly.t / this.fly.dur);

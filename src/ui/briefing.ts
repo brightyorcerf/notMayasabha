@@ -10,8 +10,8 @@
 import * as THREE from 'three';
 import type { Viewer } from '../view3d/viewer';
 import type { RoomGraph, Route } from '../analysis/graph';
-import { OUTSIDE } from '../analysis/graph';
 import type { SiteDocument } from '../core/types';
+import { routePath, etaSeconds, formatEta, BRIEFING_FLIGHT_MS } from './routePath';
 
 export interface BriefStep {
   title: string;
@@ -43,22 +43,7 @@ export class Briefing {
     const exit = gr.edges.find((e) => e.is_exit);
     const base = (id: string): number => this.site.storeys.find((s) => s.id === id)?.elevation_m ?? 0;
 
-    const routePts = (): THREE.Vector3[] => {
-      const pts: THREE.Vector3[] = [];
-      if (!route) return pts;
-      for (let i = 0; i < route.nodes.length; i++) {
-        const n = gr.nodes.get(route.nodes[i]);
-        if (n && n.room_id) pts.push(new THREE.Vector3(n.centre_u[0] * this.mpu, base(n.storey_id) + 1.6, n.centre_u[1] * this.mpu));
-        const e = route.edges[i];
-        if (e) pts.push(new THREE.Vector3(e.point_u[0] * this.mpu, base(e.storey_id) + 1.6, e.point_u[1] * this.mpu));
-      }
-      if (route.nodes[0] === OUTSIDE && pts.length >= 2) {
-        const d = new THREE.Vector3().subVectors(pts[0], pts[1]).setY(0).normalize().multiplyScalar(7);
-        pts.unshift(new THREE.Vector3().addVectors(pts[0], d));
-      }
-      return pts;
-    };
-
+    const rp = routePath(gr, route, this.site, this.mpu);
     const nDoors = route ? route.doors : 0;
     const adj = target ? gr.adj.get(target.key)!.map((a) => gr.nodes.get(a.to)!.name) : [];
 
@@ -93,16 +78,18 @@ export class Briefing {
         body: !target
           ? 'No target selected.'
           : route
-            ? `Entry to ${target.name}: ${nDoors} doors. The route is the shortest path over the ` +
-              'room graph, where rooms are nodes and doorways are edges.'
+            ? `Entry to ${target.name}: ${nDoors} doors, ${rp.length_m.toFixed(0)} m, about ` +
+              `${formatEta(etaSeconds(rp.length_m))} at walking pace. The route is the shortest ` +
+              'path over the room graph, where rooms are nodes and doorways are edges.'
             : `NO ROUTE to ${target.name}. The room graph is disconnected between the entry and ` +
               'this space — no door or stair links them. Do not brief this path; verify the plan first.',
         warn: !!target && !route,
         run: () => {
           for (const s of this.site.storeys) V.setStoreyVisible(s.id, true);
           V.setRoofVisible(false);
-          const pts = routePts();
-          if (pts.length >= 2) V.followPath(pts, 7.5, 6500);
+          // Fixed and brisk: this is one beat in a rehearsed five-step sequence, and the
+          // honest distance and time are in the body text above, not in the camera's clock.
+          if (rp.points.length >= 2) V.followPath(rp.points, 7.5, BRIEFING_FLIGHT_MS);
           else V.flyTo(new THREE.Vector3(10, 26, -18), centre, 1400);
         },
       },
