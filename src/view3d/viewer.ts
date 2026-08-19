@@ -14,11 +14,19 @@ import type { SiteMeshes } from '../geometry/build3d';
 import type { Grid } from '../core/grid';
 import type { SiteDocument, Stair } from '../core/types';
 import { frameBox as fitFrame } from './framing';
+import { PostFX, markGlow } from './postfx';
+import { applyWallRim } from './rim';
 
 const EYE_M = 1.6;
 const BODY_R = 0.28;
 const WALK_MS = 3.1;
 const RUN_MS = 6.0;
+
+/** Seconds of no pointer input before the doll-house starts its slow drift. */
+const IDLE_S = 5;
+/** Below this, sustained, the expensive AO pass is dropped. Measured, not assumed. */
+const DEGRADE_FPS = 40;
+const DEGRADE_S = 2.5;
 
 export type ViewMode = 'ORBIT' | 'WALK';
 
@@ -60,6 +68,10 @@ export class Viewer {
   /** Exterior wall materials, de-duplicated. X-ray mode reaches through these. */
   private extWallMats = new Set<THREE.MeshStandardMaterial>();
   private xray = false;
+  private fx: PostFX | null = null;
+  private autoOrbit = true;
+  private lastInput = performance.now();
+  private slowFor = 0;
 
   constructor(
     private el: HTMLElement,
@@ -130,10 +142,19 @@ export class Viewer {
       if (mat instanceof THREE.MeshStandardMaterial) this.extWallMats.add(mat);
     }
 
+    // A cool Fresnel edge. Without it a grey wall against a grey-blue ground has no
+    // silhouette at all from the doll-house camera.
+    applyWallRim(meshes.root, 0x7fb2ff, 0.30, 2.6);
+
     const c = meshes.bounds.getCenter(new THREE.Vector3());
     this.orbit = new OrbitControls(this.camera, this.renderer.domElement);
     this.orbit.target.copy(c);
     this.orbit.enableDamping = true;
+    // Heavier damping than the stock 0.05: the camera coasts to a stop instead of
+    // stopping dead with the mouse. Half of "looks expensive" is motion quality.
+    this.orbit.dampingFactor = 0.075;
+    // Slow enough to read as a considered presentation, not a screensaver.
+    this.orbit.autoRotateSpeed = 0.45;
     this.orbit.maxPolarAngle = Math.PI * 0.495;
     // Map-style handling: the wheel zooms toward the cursor, not the orbit centre,
     // and the dolly is clamped so you cannot fall inside a wall or lose the building.
@@ -146,6 +167,15 @@ export class Viewer {
 
     this.lock = new PointerLockControls(this.camera, this.renderer.domElement);
     this.scene.add(this.lock.getObject());
+
+    // Any real input restarts the idle clock. `change` is not usable here: the drift
+    // itself fires it, so the camera would keep its own idle timer alive forever.
+    this.orbit.addEventListener('start', () => this.touch());
+    for (const ev of ['pointerdown', 'wheel'] as const) {
+      this.renderer.domElement.addEventListener(ev, () => this.touch(), { passive: true });
+    }
+
+    this.fx = new PostFX(this.renderer, this.scene, this.camera, 1, 1);
 
     addEventListener('keydown', (e) => {
       this.keys.add(e.code);
@@ -179,7 +209,29 @@ export class Viewer {
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
+    this.fx?.setSize(w, h);
   }
+
+  /** Restart the idle clock. Called by every genuine pointer input. */
+  private touch(): void {
+    this.lastInput = performance.now();
+    this.orbit.autoRotate = false;
+  }
+
+  /** Slow drift while the doll-house sits idle. Off in walkthrough and mid-cinematic. */
+  setAutoOrbit(on: boolean): void {
+    this.autoOrbit = on;
+    if (!on) this.orbit.autoRotate = false;
+  }
+
+  get autoOrbitOn(): boolean { return this.autoOrbit; }
+
+  /** Post-processing master switch. The one key to press if a laptop struggles. */
+  setEffects(on: boolean): void {
+    if (this.fx) this.fx.enabled = on;
+  }
+
+  get effectsOn(): boolean { return this.fx?.enabled ?? false; }
 
   /** Enter the walkthrough at a world point, facing a direction. */
   enterWalk(x: number, z: number, yawTo?: THREE.Vector3): void {
@@ -376,6 +428,7 @@ export class Viewer {
     // already in flight kept running underneath a later `flyTo` until its own timer ran out.
     this.stopCinematic();
     this.enterOrbit();
+    this.touch();
     this.fly = {
       from: this.camera.position.clone(), to: pos.clone(),
       fromLook: this.orbit.target.clone(), toLook: look.clone(),
@@ -392,6 +445,7 @@ export class Viewer {
     if (this.locked || points.length < 2) return;
     this.stopCinematic();
     this.enterOrbit();
+    this.touch();
     this.path = {
       curve: new THREE.CatmullRomCurve3(points, false, 'catmullrom', 0.2),
       t: 0, dur: ms / 1000, height,
@@ -427,12 +481,35 @@ export class Viewer {
     } else if (this.mode === 'WALK') {
       this.walkStep(dt);
     } else {
+      this.orbit.autoRotate =
+        this.autoOrbit && (performance.now() - this.lastInput) / 1000 > IDLE_S;
       this.orbit.update();
     }
-    this.renderer.render(this.scene, this.camera);
+
+    // Overlays are rebuilt on every document change, and a fresh mesh carries only
+    // layer 0. Re-marking here is a few dozen objects a frame and cannot go stale.
+    markGlow(this.overlay);
+    if (this.fx) this.fx.render();
+    else this.renderer.render(this.scene, this.camera);
 
     this.frames++; this.fpsAcc += dt;
     if (this.fpsAcc >= 0.5) { this.fps = this.frames / this.fpsAcc; this.frames = 0; this.fpsAcc = 0; }
+    this.degradeCheck(dt);
+  }
+
+  /**
+   * Measured degradation, not a guess. If the frame rate stays under DEGRADE_FPS the
+   * whole post chain is dropped once, loudly, and never re-enabled on its own. A
+   * readable building at 60 fps beats a pretty one at 25 in front of a judge.
+   */
+  private degradeCheck(dt: number): void {
+    if (!this.fx || !this.fx.enabled) return;
+    this.slowFor = this.fps > 0 && this.fps < DEGRADE_FPS ? this.slowFor + dt : 0;
+    if (this.slowFor < DEGRADE_S) return;
+    this.fx.enabled = false;
+    console.warn(
+      `viewer: ${this.fps.toFixed(0)} fps for ${DEGRADE_S}s — post-processing disabled.`,
+    );
   }
 
   setStoreyVisible(id: string, on: boolean): void {
