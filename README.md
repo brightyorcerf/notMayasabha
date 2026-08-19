@@ -5,6 +5,8 @@ A commander can brief an assault team in minutes, on an air-gapped laptop.**
 
 SIH1773 — Conversion of 2D Blueprints into 3D Model. National Security Guard, MHA.
 
+**Live: [notmayasabha.vercel.app](https://notmayasabha.vercel.app)**
+
 ```bash
 npm install
 npm run dev        # http://127.0.0.1:5173
@@ -69,6 +71,149 @@ Rehearse it five times. Time it. The demo decides the result more than the code 
 - The neighbourhood pack is **hand-authored in the OpenStreetMap schema**, not real OSM
   data. The UI says so. Swapping in real PMTiles is a data change, not a code change.
 - The content hash is FNV-1a, not SHA-256. It is a cache and tamper key, not a signature.
+
+---
+
+## Tactical markers — what every colour in the 3D view means
+
+Nothing in the viewer is decorative. Every colour is a computed property of the room
+graph, drawn in `src/view3d/overlays.ts`. If you can't say what a marker means, don't
+point at it.
+
+| Marker | Colour / shape | Meaning |
+|---|---|---|
+| **Bridge door** | Red door slab | A graph bridge (§ below). Remove this door and the building splits into two disconnected pieces. The single points of failure |
+| Ordinary door | Grey door slab | Redundant — there is another way around |
+| Entry pylon | Green cone, floating | An `is_entry` opening |
+| Exit pylon | Yellow cone, floating | An `is_exit` opening |
+| Route | Cyan tube, with a ring at every doorway it crosses | The currently computed shortest path over the door graph |
+| **Critical room** | Orange-tinted floor | An articulation point (§ below). Losing this room disconnects the graph, independent of any single door |
+| Target beacon | Red/pink translucent cylinder | The room selected as the objective for the current route |
+| Briefing marker | Pink octahedron on a stem | A human-placed threat / hostage / IED / cover marker |
+| Selection outline | Cyan-green box | Whatever room or door is currently selected in either view |
+| Wall tint | Faint wash of the room's floor colour | Added so a first-person walker can tell which room they're in without leaving the walkthrough — see `storeyInteriorWallGeometry` in `src/geometry/build3d.ts` |
+
+---
+
+## Why this is not just "2D → 3D"
+
+Extruding walls from a floor plan is a rendering problem with a fixed answer: it has
+been solved since Raster-to-Vector (Liu et al., ICCV 2017). Everything after extrusion
+in this project is a different kind of problem — a **derivation** problem, with a real,
+checkable mathematical answer, not a rendered guess.
+
+**One occupancy grid, four consumers.** `src/core/grid.ts` flood-fills a `Uint8Array`
+from each room's seed point. Room extraction, room area, walkthrough collision and the
+corridor-width sanity check all read that same grid. Nothing is polygonized, so an
+unclosed wall loop degrades to one visibly-too-large room instead of throwing — a
+detectable failure mode instead of a silent one.
+
+**The room graph is the real artifact.** `src/analysis/graph.ts` turns the floor plan
+into a graph: rooms are nodes, doors and stairs are edges. Three classical graph
+algorithms run on it, each O(V+E), each with a genuine tactical reading:
+
+- **Bridges** (`bridges()`, iterative Tarjan low-link DFS) — a door is an *edge*, so
+  "which doors are critical" is a **bridge** question, not a cut-vertex question. Most
+  teams get this backwards.
+- **Articulation points** (`articulationPoints()`, same DFS) — a room is a *node*, so
+  "which rooms are critical" is the cut-vertex question. Bridges and articulation
+  points answer different questions and are drawn with different colours on purpose.
+- **Betweenness centrality** (`betweenness()`) — which rooms sit on the most
+  shortest paths between other rooms. The corridor lights up because the graph says
+  so, not because someone decided corridors are important.
+
+**Scale is falsifiable, not assumed.** `src/core/scale.ts` runs five independent,
+deterministic sanity checks — door width, wall thickness, corridor width, bounding
+box against a manually-entered dimension, and smallest room area — against
+**configurable plausibility bounds**, not universal truths. `VALIDATED` requires zero
+`FAIL` and at most one `WARN`. If the scale is unknown, the state is `UNSCALED`: a
+legal, visible, red-banner state where areas are **refused, not defaulted**, and
+export and briefing are blocked. A confidently wrong building is the worst output this
+system can produce, so the system is built to say "I don't know" instead.
+
+None of this needed a neural network. It needed the floor plan to become a graph
+instead of a picture — and once it's a graph, sixty years of graph theory is free.
+
+---
+
+## What to tell the judges
+
+This is an internal SIH selection round, not a stage pitch. Two faculty visits:
+**2:30 PM** is unscored mentoring — get real feedback, don't perform for it. **4:00 PM**
+is the evaluation, and it scores how well you engaged with that feedback, not whether
+you agreed with all of it. You are explicitly allowed to defend a decision to not
+take a piece of feedback — with a reason, not a shrug.
+
+What they are actually checking for, in order:
+
+1. **Do you understand the real problem, and who has it** — not the technology you
+   wanted to use. Lead every answer with the commander under time pressure, not with
+   three.js or graph theory.
+2. **Does the solution genuinely follow from the problem**, or was the problem
+   reverse-engineered to justify a tool you liked? If asked "why graph theory," the
+   honest answer is the problem statement itself: NSG needs chokepoints and critical
+   rooms, and a room graph is the only representation that can answer that question
+   at all — a rendered mesh cannot.
+3. **Did you engage with round-1 feedback** — by 4:00 PM, be ready to say plainly
+   what changed and, just as importantly, what you deliberately did *not* change and
+   why.
+4. **Is there a realistic, buildable 36-hour plan** with named ownership — not "we'll
+   figure it out." Use the day-by-day plan and the six roles in `docs/sih.md` §15 as
+   the answer, not an aspiration.
+
+### The sentence to open with
+
+> "A commander gets a paper floor plan. He has twenty minutes to brief an assault
+> team. We give him a 3D walkthrough in under a minute, on a laptop with no internet."
+
+Say this before any mention of three.js, TypeScript, or graph theory. Technology is
+the answer to a question the judges haven't asked yet.
+
+### The best three things to actually show
+
+1. **Turn the network adapter off, on screen**, then keep working. The SEALED badge
+   counts every outbound attempt and refuses it — this is provable, not claimed, and
+   it is the single most memorable thing you can do in the room.
+2. **Click Clear scale.** Red banner. Areas refuse to render instead of guessing.
+   "A commander told a corridor is 2.0 m when it is 1.2 m is worse off than a
+   commander told nothing." This is the line that separates you from a team that
+   just renders a mesh.
+3. **The bridges list next to the route.** "Two doors are bridges — remove one and
+   the building splits in two. A door is an edge, so the critical-door question is a
+   bridge question. The rooms whose removal splits the building are the articulation
+   points, and they get a different colour on purpose." A technical mentor will
+   notice you got this distinction right.
+
+### If feedback pushes on something, and you disagree
+
+Say so, with the reason, out loud — that is what "engaged with feedback, not
+compliant with feedback" means to this rubric. Examples already reasoned through in
+`docs/sih.md`:
+
+- If told to fake the Google Maps integration the problem statement literally asks
+  for: the terms of service prohibit bulk offline caching of Google tiles. That's not
+  a corner cut, it's a legal constraint — the OSM-schema offline pack is the answer,
+  not a workaround.
+- If told the CV/parsing pipeline should be the headline: the blueprint in this demo
+  is a hand-authored fixture on purpose, so the demo doesn't depend on the riskiest,
+  least-differentiating part of the pipeline. Perception is deferred, not skipped.
+
+### Honest answers beat confident ones
+
+Straight from `docs/sih.md` §13 and §17 — this is what the mentors are trained to
+listen for:
+
+- "What if the model is wrong?" → Confidence per element, a review canvas, an audit
+  log with `prev_hash`. The system is designed to be wrong *safely*, not to never be
+  wrong.
+- "What's genuinely new here?" → The combination, not the parser. Floor-plan-to-3D is
+  commodity. Air-gapped, auditable, tactical semantics with a measured
+  human-correction loop is not. Say this plainly — overclaiming novelty is the
+  fastest way to lose a technical panel.
+- If you don't know an answer, say so. Every source on hackathon judging agrees:
+  honest uncertainty scores better than a confident guess, and a team that can't
+  answer questions about its own assumptions is the single most common reason teams
+  don't advance.
 
 ---
 
