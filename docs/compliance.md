@@ -1,9 +1,6 @@
-# SIH1773 — COMPLIANCE AUDIT
+# SIH1773: COMPLIANCE AUDIT
 
-Design audited: TRINETRA v2 + v2.1 freeze patch.
-This is a requirements check, not a design document. It changes the deferred list only.
-
-Written in Simplified Technical English.
+This is a requirements check, not a design document. 
 
 ---
 

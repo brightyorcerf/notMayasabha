@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TRINETRA — blueprint to tactical 3D</title>
+    <link rel="stylesheet" href="./src/ui/style.css" />
+  </head>
+  <body>
+    <header id="topbar">
+      <div class="brand">
+        <span class="mark">▲</span>
+        <div>
+          <div class="name">TRINETRA</div>
+          <div class="sub">2D blueprint → tactical 3D walkthrough · SIH1773 · NSG</div>
+        </div>
+      </div>
+      <div class="badges">
+        <span class="badge" id="badge-net">SEALED · 0 outbound</span>
+        <span class="badge" id="badge-scale">SCALE</span>
+        <span class="badge" id="badge-status">DRAFT</span>
+        <span class="badge mono" id="badge-hash">—</span>
+        <span class="badge mono" id="badge-fps">— fps</span>
+      </div>
+      <div class="actions">
+        <button id="btn-orbit" class="on">Doll-house</button>
+        <button id="btn-walk">Walkthrough</button>
+        <button id="btn-brief">Briefing Mode</button>
+        <button id="btn-export">Export GLB</button>
+      </div>
+    </header>
+
+    <main>
+      <section id="left">
+        <div class="panel-head">
+          <span>2D PLAN</span>
+          <span class="storey-tabs" id="storey-tabs"></span>
+        </div>
+        <canvas id="plan"></canvas>
+        <div id="plan-mode"></div>
+
+        <div class="panel-head"><span>SCALE</span><span class="hint" id="scale-state"></span></div>
+        <div id="scale"></div>
+
+        <div class="panel-head">
+          <span>REVIEW &amp; STATUS GATE</span>
+          <span class="hint" id="gate-hint"></span>
+        </div>
+        <div id="findings"></div>
+        <div class="row" id="status-row">
+          <button id="btn-review">Mark REVIEWED</button>
+          <button id="btn-lock">LOCK for briefing</button>
+        </div>
+
+        <div class="panel-head"><span>MANUAL PARAMETERS</span><span class="hint" id="param-source"></span></div>
+        <div id="params"></div>
+      </section>
+
+      <section id="centre">
+        <div id="view3d"></div>
+        <div id="unscaled-banner">UNSCALED MODEL — NOT FOR TACTICAL USE</div>
+        <div id="hud">
+          <div id="hud-room">—</div>
+          <div id="hud-help">Click <b>Walkthrough</b>, then WASD to move, mouse to look, Shift to run, Esc to release the pointer.</div>
+        </div>
+        <div id="briefing">
+          <div class="b-step" id="b-step">1 / 5</div>
+          <div class="b-title" id="b-title"></div>
+          <div class="b-body" id="b-body"></div>
+          <div class="b-nav">← → to step · Esc to leave</div>
+        </div>
+      </section>
+
+      <section id="right">
+        <div class="panel-head"><span>TACTICAL LAYER</span></div>
+        <div class="row">
+          <label>From</label>
+          <select id="sel-from"></select>
+        </div>
+        <div class="row">
+          <label>To</label>
+          <select id="sel-to"></select>
+        </div>
+        <div class="row">
+          <button id="btn-route" class="wide">Compute route</button>
+          <button id="btn-save-route">Save to briefing</button>
+        </div>
+        <div id="route-out"></div>
+
+        <div class="panel-head"><span>CRITICAL DOORS <em>(bridges)</em></span></div>
+        <div id="bridges"></div>
+
+        <div class="panel-head"><span>CRITICAL ROOMS <em>(articulation points)</em></span></div>
+        <div id="critical"></div>
+
+        <div class="panel-head"><span>SELECTION</span></div>
+        <div id="selection">Nothing selected. Click a room or a door, in either view.</div>
+        <div class="row" id="sel-actions"></div>
+
+        <div class="panel-head">
+          <span>AUDIT LOG <em>(ops.jsonl)</em></span>
+          <span class="hint" id="chain-state"></span>
+        </div>
+        <div class="row">
+          <button id="btn-undo">Undo</button>
+          <button id="btn-export-ops">Export log</button>
+        </div>
+        <div id="ops"></div>
+
+        <div class="panel-head"><span>MEASURED SUPERVISION</span></div>
+        <div id="metrics"></div>
+
+        <div class="panel-head"><span>VIEW</span></div>
+        <div id="toggles"></div>
+
+        <div class="panel-head"><span>OFFLINE POSTURE</span></div>
+        <div id="netlog"></div>
+      </section>
+    </main>
+
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>

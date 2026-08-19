@@ -1,0 +1,19 @@
+{
+  "source": "Hand-authored stand-in in the OpenStreetMap schema. NOT real OSM data.",
+  "licence": "Fixture. The real area pack ships OpenStreetMap (ODbL) and Sentinel-2 (Copernicus).",
+  "origin_lat": 28.367,
+  "origin_lon": 76.937,
+  "items": [
+    { "id": "n1", "kind": "BUILDING", "name": "Block A", "levels": 3, "width_m": 0, "outline_m": [[-26,2],[-6,2],[-6,18],[-26,18]] },
+    { "id": "n2", "kind": "BUILDING", "name": "Block C", "levels": 2, "width_m": 0, "outline_m": [[-26,26],[-8,26],[-8,40],[-26,40]] },
+    { "id": "n3", "kind": "BUILDING", "name": "Workshop", "levels": 1, "width_m": 0, "outline_m": [[4,30],[22,30],[22,44],[4,44]] },
+    { "id": "n4", "kind": "BUILDING", "name": "Block D", "levels": 4, "width_m": 0, "outline_m": [[32,24],[48,24],[48,38],[32,38]] },
+    { "id": "n5", "kind": "BUILDING", "name": "Store shed", "levels": 1, "width_m": 0, "outline_m": [[32,-6],[46,-6],[46,8],[32,8]] },
+    { "id": "n6", "kind": "BUILDING", "name": "Guard post", "levels": 1, "width_m": 0, "outline_m": [[-22,-22],[-12,-22],[-12,-14],[-22,-14]] },
+    { "id": "n7", "kind": "BUILDING", "name": "Block E", "levels": 5, "width_m": 0, "outline_m": [[6,-30],[24,-30],[24,-16],[6,-16]] },
+    { "id": "r1", "kind": "ROAD", "name": "North approach", "levels": 0, "width_m": 9, "outline_m": [[-44,21],[60,21]] },
+    { "id": "r2", "kind": "ROAD", "name": "East service road", "levels": 0, "width_m": 7, "outline_m": [[28,-40],[28,52]] },
+    { "id": "r3", "kind": "ROAD", "name": "South approach", "levels": 0, "width_m": 7, "outline_m": [[-44,-10],[60,-10]] },
+    { "id": "r4", "kind": "ROAD", "name": "Target access", "levels": 0, "width_m": 5, "outline_m": [[3.5,-10],[3.5,-1.5]] }
+  ]
+}
