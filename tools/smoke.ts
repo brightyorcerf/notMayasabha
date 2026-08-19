@@ -46,8 +46,8 @@ for (const e of gr.edges) {
 }
 console.log(`\n-- dead ends --  ${deadEnds(gr).map((k) => gr.nodes.get(k)!.name).join(', ')}`);
 
-const target = [...gr.nodes.values()].find((n) => n.name === 'Server Room')!;
-const upper = [...gr.nodes.values()].find((n) => n.name === 'Office C')!;
+const target = [...gr.nodes.values()].find((n) => n.name === 'ECR 3')!;
+const upper = [...gr.nodes.values()].find((n) => n.name === 'Faculty 4')!;
 for (const dest of [target, upper]) {
   const r = route(gr, OUTSIDE, dest.key);
   console.log(`\n-- route: Exterior -> ${dest.name} --`);
@@ -56,16 +56,16 @@ for (const dest of [target, upper]) {
 
 const gg = s.derived.grids.get('st-ground')!;
 console.log('\n-- occupancy grid --');
-console.log(`  doorway at main entry blocked? ${blockedAt(gg, 3.5, 0)}  (must be false)`);
-console.log(`  solid wall at (5.0, 0) blocked? ${blockedAt(gg, 5.0, 0)}  (must be true)`);
+console.log(`  doorway at main entry blocked? ${blockedAt(gg, 2.0, 26)}  (must be false)`);
+console.log(`  solid wall at (2.0, 20) blocked? ${blockedAt(gg, 2.0, 20)}  (must be true)`);
 
 let gate = statusGate(s.doc, s.derived.findings, new Set());
 console.log(`\n-- gate at load --  blocking=${gate.blocking.length} warning=${gate.warnings.length} export=${gate.exportAllowed} briefing=${gate.briefingAllowed}`);
 
 // --- the op log, exercised the way the demo exercises it ---
 console.log('\n-- op log --');
-s.do('SET_WALL_PROPS', ['g-w-cs2'], { breachable: true, breach_note: 'Half brick. Operator assessed.' }, 'mark breachable');
-s.do('ADD_MARKER', ['mk-1'], { storey_id: 'st-ground', x_u: 16.5, y_u: 2.5, kind: 'THREAT', label: 'Suspect last seen' }, 'threat marker');
+s.do('SET_WALL_PROPS', ['w-rad-72'], { breachable: true, breach_note: 'Half brick. Operator assessed.' }, 'mark breachable');
+s.do('ADD_MARKER', ['mk-1'], { storey_id: 'st-ground', x_u: 40, y_u: 30, kind: 'THREAT', label: 'Suspect last seen' }, 'threat marker');
 s.do('CLEAR_SCALE', [], { scale: unscaledRecord(new Date().toISOString()) }, 'clear scale');
 gate = statusGate(s.doc, s.derived.findings, new Set());
 console.log(`  after CLEAR_SCALE: unscaled=${s.derived.unscaled} displayMpu=${s.derived.mpu.toFixed(4)} export=${gate.exportAllowed} blocking=${gate.blocking.length}`);
@@ -95,7 +95,7 @@ console.log(`  briefing allowed after LOCKED: ${gate.briefingAllowed}`);
 const d2 = derive(loadDoc());
 const fail =
   br.size === 0 || ap.size === 0 ||
-  blockedAt(gg, 3.5, 0) || !blockedAt(gg, 5.0, 0) ||
+  blockedAt(gg, 2.0, 26) || !blockedAt(gg, 2.0, 20) ||
   !route(gr, OUTSIDE, target.key) ||
   !s.verifyChain() ||
   !gate.briefingAllowed ||
