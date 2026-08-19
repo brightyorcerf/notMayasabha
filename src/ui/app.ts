@@ -483,7 +483,7 @@ export function start(): void {
     btn.disabled = true;
     btn.textContent = 'Exporting…';
     try {
-      const bytes = await exportGLB(viewer.world, `trinetra-${S.doc.doc_id}-${S.derived.hash}.glb`);
+      const bytes = await exportGLB(viewer.world, `Mayasabha-${S.doc.doc_id}-${S.derived.hash}.glb`);
       btn.textContent = `GLB ${(bytes / 1e6).toFixed(1)} MB`;
     } catch (err) {
       btn.textContent = 'Export failed';

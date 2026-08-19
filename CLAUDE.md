@@ -1,4 +1,4 @@
-# TRINETRA — SIH1773, 2D blueprint → tactical 3D
+# Mayasabha — SIH1773, 2D blueprint → tactical 3D
 
 One document of record. Where the source documents disagree, this file wins.
 
