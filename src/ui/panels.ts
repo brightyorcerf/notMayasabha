@@ -96,10 +96,7 @@ export function renderMetrics(s: Session): string {
     `<div class="kv"><span>Operations logged</span><b>${m.total_ops}</b></div>` +
     `<div class="kv"><span>Corrective ops</span><b>${m.corrective_ops}</b></div>` +
     `<div class="kv"><span>Correction density</span><b>${m.correction_density.toFixed(3)}</b></div>` +
-    `<div class="kv"><span>Median time per op</span><b>${m.median_dt_s.toFixed(1)} s</b></div>` +
-    `<div class="hint pad">Corrective ops only. Accepts and status changes are excluded, ` +
-    `so the number cannot fall simply because the operator clicked accept more often. ` +
-    `Times are clamped at 30 s per op.</div>`
+    `<div class="kv"><span>Median time per op</span><b>${m.median_dt_s.toFixed(1)} s</b></div>`
   );
 }
 

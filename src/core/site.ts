@@ -53,12 +53,12 @@ export function contentHash(v: unknown): string {
 /**
  * The bundled plans, in demo order. Both are compiled in at build time; switching
  * between them fetches nothing. `mahindra` is the demo hero — a schematic of a real
- * 2D blueprint. `training-block` is the frozen contract fixture of CLAUDE.md §9 and
+ * 2D blueprint. `standard` is the frozen contract fixture of CLAUDE.md §9 and
  * the only two-storey plan, so it is what exercises stairs and inter-floor routing.
  */
 export const PLANS = [
   { id: 'mahindra', label: 'Mahindra Block', doc: siteJson },
-  { id: 'training-block', label: 'Training Block B', doc: trainingBlockJson },
+  { id: 'standard', label: 'Standard', doc: trainingBlockJson },
 ] as const;
 
 export type PlanId = (typeof PLANS)[number]['id'];

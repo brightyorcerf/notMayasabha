@@ -13,6 +13,7 @@ import type { RoomGraph, GEdge, Route } from '../analysis/graph';
 import { OUTSIDE } from '../analysis/graph';
 import type { SiteMeshes } from '../geometry/build3d';
 import type { SiteDocument } from '../core/types';
+import { roomOutlineSegments, type Grid } from '../core/grid';
 import { makeLabel, type Label } from './labels';
 
 export const COL = {
@@ -54,6 +55,7 @@ export class Overlays {
     group: THREE.Group,
     private site: SiteDocument,
     private meshes: SiteMeshes,
+    private grids: Map<string, Grid>,
   ) {
     group.add(this.routeGroup, this.markerGroup, this.selectGroup, this.labelGroup);
     for (const s of meshes.storeys.values()) {
@@ -252,20 +254,50 @@ export class Overlays {
     this.labelGroup.clear();
   }
 
-  /** One box outline around the selected room or door. */
+  /**
+   * The true outline of the selected room or door, not its bounding box. A bounding
+   * box drawn around a wedge-shaped room (a rotunda's radial fan) is most of the
+   * neighbouring rooms too — see `core/grid.ts`'s `roomOutlineSegments` docstring.
+   * A door's box IS axis-aligned in its own local frame, so its exact edges are just
+   * that geometry's `EdgesGeometry`, carried by the door's own position and rotation.
+   */
   select(kind: 'room' | 'door' | null, storeyId?: string, id?: string): void {
     this.selectGroup.clear();
     if (!kind || !storeyId || !id) return;
+    const st = this.site.storeys.find((x) => x.id === storeyId);
     const s = this.meshes.storeys.get(storeyId);
-    if (!s) return;
-    const mesh = kind === 'room' ? s.floors.get(id) : s.doors.get(id);
-    if (!mesh) return;
-    mesh.updateMatrix();
-    mesh.geometry.computeBoundingBox();
-    const box = mesh.geometry.boundingBox!.clone().applyMatrix4(mesh.matrix);
-    if (kind === 'room') box.max.y += 3.0;
-    const helper = new THREE.Box3Helper(box, new THREE.Color(COL.select));
-    (helper.material as THREE.Material).depthTest = false;
+    if (!st || !s) return;
+
+    if (kind === 'door') {
+      const mesh = s.doors.get(id);
+      if (!mesh) return;
+      const helper = new THREE.LineSegments(
+        new THREE.EdgesGeometry(mesh.geometry),
+        new THREE.LineBasicMaterial({ color: COL.select, depthTest: false }),
+      );
+      helper.position.copy(mesh.position);
+      helper.rotation.copy(mesh.rotation);
+      helper.renderOrder = 10;
+      this.selectGroup.add(helper);
+      return;
+    }
+
+    const idx = st.rooms.findIndex((r) => r.id === id);
+    const g = this.grids.get(storeyId);
+    if (idx < 0 || !g) return;
+    const edges = roomOutlineSegments(g, idx);
+    const yLo = st.elevation_m + 0.05, yHi = st.elevation_m + 3.0;
+    const pos: number[] = [];
+    for (let k = 0; k < edges.length; k += 4) {
+      const [ax, ay, bx, by] = [edges[k], edges[k + 1], edges[k + 2], edges[k + 3]];
+      pos.push(ax, yLo, ay, bx, yLo, by);
+      pos.push(ax, yHi, ay, bx, yHi, by);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    const helper = new THREE.LineSegments(
+      geo, new THREE.LineBasicMaterial({ color: COL.select, depthTest: false }),
+    );
     helper.renderOrder = 10;
     this.selectGroup.add(helper);
   }

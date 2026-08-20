@@ -89,7 +89,7 @@ export function start(): void {
   const hood = buildNeighbourhood(loadPack());
   viewer.scene.add(hood);
 
-  const overlays = new Overlays(viewer.overlay, S.doc, meshes);
+  const overlays = new Overlays(viewer.overlay, S.doc, meshes, S.derived.grids);
   const plan = new Plan2D($<HTMLCanvasElement>('plan'), S, gr);
   const brief = new Briefing(viewer, S.doc, S.derived.grids, S.derived.mpu, {
     wrap: $('briefing'), step: $('b-step'), title: $('b-title'), body: $('b-body'),
@@ -247,12 +247,27 @@ export function start(): void {
   };
 
   // ------------------------------------------------------------------ analysers
+  /**
+   * A long always-open list of bridges or critical rooms was most of what made the
+   * right panel feel crowded — a rotunda-shaped plan alone puts nine bridges on
+   * screen at once. Items beyond CAP get an `of-item` class the CSS hides by default;
+   * a trailing toggle reveals them without a second render, so click handlers on the
+   * items already in the DOM never need reattaching.
+   */
+  const CAP = 4;
+  const withShowMore = (id: string, items: string[]): string => {
+    if (items.length <= CAP) return items.join('');
+    const shown = items.slice(0, CAP).join('');
+    const hidden = items.slice(CAP).map((h) => h.replace('class="item', 'class="item of-item')).join('');
+    return shown + hidden + `<button class="show-more" data-for="${id}">Show all ${items.length}</button>`;
+  };
+
   const renderAnalysers = (): void => {
     const bridgeEdges = gr.edges.filter((e) => br.has(e.key));
     $('bridges').innerHTML = bridgeEdges.length
-      ? bridgeEdges.map((e) => `<div class="item bridge" data-door="${e.opening_id ?? ''}" data-storey="${e.storey_id}">
+      ? withShowMore('bridges', bridgeEdges.map((e) => `<div class="item bridge" data-door="${e.opening_id ?? ''}" data-storey="${e.storey_id}">
           <b>${e.label}</b><br>${e.kind === 'STAIR' ? 'stairway — the only link between these floors' : 'the only door between these spaces'}
-          <div class="tech">technical: ${e.kind === 'STAIR' ? e.stair_id : e.opening_id}</div></div>`).join('')
+          <div class="tech">technical: ${e.kind === 'STAIR' ? e.stair_id : e.opening_id}</div></div>`))
       : '<div class="empty">No bridges. Every space has a second way in.</div>';
     $('bridges').querySelectorAll<HTMLElement>('[data-door]').forEach((n) => {
       n.onclick = () => {
@@ -263,13 +278,22 @@ export function start(): void {
     const crit = [...ap].map((k) => gr.nodes.get(k)!).filter((n) => n && n.room_id);
     crit.sort((a, b) => (bc.get(b.key) ?? 0) - (bc.get(a.key) ?? 0));
     $('critical').innerHTML = crit.length
-      ? crit.map((n) => `<div class="item crit" data-room="${n.room_id}" data-storey="${n.storey_id}">
+      ? withShowMore('critical', crit.map((n) => `<div class="item crit" data-room="${n.room_id}" data-storey="${n.storey_id}">
           <b>${n.name}</b><br>losing this room cuts off other spaces — ${gr.adj.get(n.key)!.length} doors
-          <div class="tech">technical: betweenness ${(bc.get(n.key) ?? 0).toFixed(1)}</div></div>`).join('')
+          <div class="tech">technical: betweenness ${(bc.get(n.key) ?? 0).toFixed(1)}</div></div>`))
       : '<div class="empty">No articulation points.</div>';
     $('critical').querySelectorAll<HTMLElement>('[data-room]').forEach((n) => {
       n.onclick = () => select({ kind: 'room', storeyId: n.dataset.storey!, id: n.dataset.room! });
     });
+
+    for (const el of document.querySelectorAll<HTMLButtonElement>('.show-more')) {
+      el.onclick = () => {
+        const target = $(el.dataset.for!);
+        const expanded = target.classList.toggle('expanded');
+        el.textContent = expanded ? 'Show fewer' : el.dataset.label!;
+      };
+      if (!el.dataset.label) el.dataset.label = el.textContent!;
+    }
   };
 
   // ------------------------------------------------------------------ selection

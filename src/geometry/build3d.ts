@@ -33,7 +33,7 @@ export const FLOOR_TINT: Record<RoomUse, number> = {
   HALL: 0x336671,
   CLASSROOM: 0x2f5774,
   PLANT: 0x58662e,
-  TOILET: 0x2e615d,
+  WASHROOM: 0x2e615d,
   PLATFORM: 0x33416c,
   UNKNOWN: 0x3f444a,
 };

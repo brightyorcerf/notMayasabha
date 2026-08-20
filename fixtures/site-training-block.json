@@ -5,7 +5,7 @@
   "modified_utc": "2026-08-18T00:00:00Z",
   "status": "DRAFT",
   "building": {
-    "name": "Training Block B (hand-authored fixture)",
+    "name": "Standard (hand-authored fixture)",
     "site_type": "GOVT",
     "notes": "Hand-authored two-storey fixture. The frozen contract every other module is built against."
   },

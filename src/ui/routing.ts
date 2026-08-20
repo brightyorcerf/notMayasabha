@@ -99,35 +99,34 @@ export function installRouting(S: Session, plan: Plan2D, overlays: Overlays, ref
         overlays.drawRoute(ref.gr, r, lastPath.plan);
         const un = S.derived.unscaled;
         const eta = etaSeconds(lastPath.traverse, paceId);
+        // Bridge count folded into the header rather than repeated in a per-door list:
+        // the Critical Doors panel already names every bridge in the building, so a
+        // second, route-scoped listing of the same doors was the same fact twice.
+        const bridgeCrossings = r.edges.filter((e) => ref.br.has(e.key)).length;
         const dist = un
           ? 'distance UNAVAILABLE (unscaled)'
           : `${lastPath.length_m.toFixed(0)} m · ~${formatEta(eta)} · ${profile(paceId).label}`;
-        // Indoors the fixed costs usually dominate, so they are shown rather than buried
-        // in an average speed. A commander who sees "62% doors and corners" learns
-        // something about the route that a single ETA does not tell them.
+        const doorLabel = `${r.doors} door${r.doors === 1 ? '' : 's'}` +
+          (bridgeCrossings ? ` (${bridgeCrossings} critical)` : '');
+        // Indoors the fixed costs usually dominate, so the share is shown rather than
+        // buried in an average speed — but the formula behind it is a hover, not a
+        // permanent line, so the panel does not spend three rows explaining one number.
         const pf = profile(paceId);
         const share = Math.round(fixedShare(lastPath.traverse, paceId) * 100);
-        const breakdown = S.derived.unscaled ? '' :
-          `<div class="pace-note">${pf.note}<br>` +
-          `<span class="k">${pf.level_mps.toFixed(2)} m/s level · ${pf.stair_mps.toFixed(2)} m/s stair · ` +
-          `${lastPath.traverse.doors} doors × ${pf.door_s}s · ${lastPath.traverse.turns} turns × ${pf.turn_s}s ` +
-          `→ ${share}% of the time is doors and corners</span></div>`;
-        const turns = S.derived.unscaled ? '' :
+        const formula = un ? '' :
+          `${pf.level_mps.toFixed(2)} m/s level · ${pf.stair_mps.toFixed(2)} m/s stair · ` +
+          `${lastPath.traverse.doors} doors × ${pf.door_s}s · ${lastPath.traverse.turns} turns × ${pf.turn_s}s`;
+        const breakdown = un ? '' :
+          `<div class="pace-note" title="${formula}">${pf.note} ` +
+          `<span class="k">${share}% doors &amp; corners</span></div>`;
+        const turns = un ? '' :
           '<div class="turn-list">' + lastPath.steps.map((st) =>
             `<div class="turn-line turn-${st.turn.toLowerCase()}"><span class="arrow">${ARROW[st.turn]}</span>${st.text}</div>`,
           ).join('') + '</div>';
         $('route-out').innerHTML =
-          `<div class="route-hdr">${r.doors} doors · ${r.nodes.length} spaces · ${dist}</div>` +
+          `<div class="route-hdr">${doorLabel} · ${r.nodes.length} spaces · ${dist}</div>` +
           breakdown +
-          turns +
-          r.nodes.map((k, i) => {
-            const n = ref.gr.nodes.get(k)!;
-            const e = r.edges[i - 1];
-            const via = e
-              ? ` <span class="k">via ${e.kind === 'STAIR' ? 'stair' : e.opening_id}${ref.br.has(e.key) ? ' · BRIDGE' : ''}</span>`
-              : '';
-            return `<div class="route-line"><span class="step">${String(i + 1).padStart(2, '0')}</span> ${n.name}${via}</div>`;
-          }).join('');
+          turns;
       } else {
         overlays.clearRoute();
         $('route-out').innerHTML =

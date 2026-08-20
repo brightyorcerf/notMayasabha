@@ -6,7 +6,7 @@
 // fill cannot leak. Output: fixtures/site.json. Not on the runtime path.
 //
 // Layout, in document units, y pointing DOWN to match the drawing:
-//   - Lobby (west), a horizontal corridor with a Toilet block,
+//   - Lobby (west), a horizontal corridor with a Washroom block,
 //   - a central Rotunda (half-disc) the radial rooms open into,
 //   - Auditorium + ECR 1..6 as sectors of a lower semicircular ring,
 //   - a curved upper Wing gallery with six Faculty rooms,
@@ -193,12 +193,12 @@ room(7, 26, 'Lobby', 'HALL');
 wall(54, 22, 54, 26, 'INTERIOR', { id: 'w-corr-e' }); // corridor east wall / stairwell west
 room(16, 24, 'Main Corridor', 'CORRIDOR');
 
-// ---- Toilet block (inside the corridor's upper strip) -------------------
+// ---- Washroom block (inside the corridor's upper strip) -----------------
 wall(26, 22, 26, 24, 'PARTITION');
 wall(32, 22, 32, 24, 'PARTITION');
 const toiletS = wall(26, 24, 32, 24, 'PARTITION');
 opening(toiletS, 3, 0.9, 'DOOR'); // toilet -> corridor
-room(29, 23, 'Toilet', 'TOILET');
+room(29, 23, 'Washroom', 'WASHROOM');
 
 // ---- Stairwell ----------------------------------------------------------
 wall(60, 22, 60, 26, 'EXTERIOR'); // stairwell east (also building east edge here)

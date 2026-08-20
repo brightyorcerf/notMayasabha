@@ -811,3 +811,28 @@ button.tiny { padding: 4px 8px; font-size: 10.5px; font-weight: 500; }
   color: var(--faint);
   margin-bottom: 20px;
 }
+
+/* ─────────────────────────────  show-more lists  ──────────────────────────── */
+
+/*
+ * Critical Doors and Critical Rooms can run long on a plan with many bridges (a
+ * rotunda alone puts nine on screen). Collapsed to CAP items by default; `.of-item`
+ * is only ever added past that cap, so this rule has no effect on a short list.
+ */
+.of-item { display: none; }
+.expanded .of-item { display: block; }
+
+.show-more {
+  display: block;
+  width: calc(100% - 20px);
+  margin: 2px 10px 8px;
+  padding: 6px 10px;
+  border-radius: var(--r-row);
+  border: 1px dashed var(--line-strong);
+  background: none;
+  color: var(--faint);
+  font: 500 11px var(--sans);
+  text-align: center;
+  cursor: pointer;
+}
+.show-more:hover { color: var(--text-2); border-color: rgba(17, 34, 64, 0.28); }

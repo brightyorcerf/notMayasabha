@@ -54,7 +54,7 @@ export class Briefing {
       {
         title: 'The target in its surroundings',
         body:
-          'Training Block B, two storeys, 240 m² footprint. Approach roads north and south, ' +
+          'Standard, two storeys, 240 m² footprint. Approach roads north and south, ' +
           'service road east. Neighbouring blocks are extruded from the offline area pack, so the ' +
           'team sees the building in its real block, not floating in space.',
         run: () => {

@@ -111,7 +111,7 @@ export interface Opening {
 
 /** v2 §2.2, extended with SERVER and STORE. Extensions are declared, not silent. */
 export type RoomUse =
-  | 'CORRIDOR' | 'HALL' | 'OFFICE' | 'CLASSROOM' | 'TOILET' | 'PLANT'
+  | 'CORRIDOR' | 'HALL' | 'OFFICE' | 'CLASSROOM' | 'WASHROOM' | 'PLANT'
   | 'STAIRWELL' | 'PLATFORM' | 'UNKNOWN' | 'SERVER' | 'STORE';
 
 /** Identity only. The polygon and the area are derived, never stored (freeze patch 3). */

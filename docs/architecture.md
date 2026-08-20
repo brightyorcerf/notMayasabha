@@ -208,7 +208,7 @@ interface Room {
   id: UUID;
   seed_point_u: [number, number];
   name: string;
-  use: "CORRIDOR"|"HALL"|"OFFICE"|"CLASSROOM"|"TOILET"|"PLANT"
+  use: "CORRIDOR"|"HALL"|"OFFICE"|"CLASSROOM"|"WASHROOM"|"PLANT"
      | "STAIRWELL"|"PLATFORM"|"UNKNOWN"|"SERVER"|"STORE";
   confidence: number; origin: "CV"|"VECTOR"|"HUMAN"; verified: boolean;
 }
@@ -727,7 +727,7 @@ a wall on stage."* It clipped walls on stage. This section is that deferral, clo
 | Route | Samples inside a wall (of 401) |
 |---|---|
 | Rotunda | 41 |
-| Toilet | 39 |
+| Washroom | 39 |
 | ECR 3 | 34 |
 | Faculty 1–6 | 0 |
 

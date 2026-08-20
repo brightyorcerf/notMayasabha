@@ -211,3 +211,38 @@ export function roomRects(g: Grid, roomIdx: number): Rect[] {
   }
   return out;
 }
+
+/**
+ * The true footprint boundary of one room, as a flat list of segment endpoints
+ * (`x1, y1, x2, y2, ...`) in document units — every cell-grid edge where the room's
+ * cell meets a non-room cell or the grid edge.
+ *
+ * A room's rendered floor is `roomRects` — a union of many fine axis-aligned strips,
+ * one per grid row — so an axis-aligned bounding box around that union is only exact
+ * for a rectangular room. For a radial or curved room (a wedge in a rotunda fan, say)
+ * the AABB is far bigger than the room, which is why a bounding-box selection
+ * highlight visibly disagreed with the room it was supposedly outlining. Tracing the
+ * mask's actual edges instead gives a highlight that matches the floor mesh exactly,
+ * because both are built from the same `roomOf` data.
+ *
+ * The segments are unordered — a boundary walk that stitches them into a closed loop
+ * is not needed to draw them, only to fill them, and this function's only consumer is
+ * a wireframe outline.
+ */
+export function roomOutlineSegments(g: Grid, roomIdx: number): number[] {
+  const out: number[] = [];
+  const at = (i: number, j: number): boolean =>
+    i >= 0 && i < g.nx && j >= 0 && j < g.ny && g.roomOf[j * g.nx + i] === roomIdx;
+  for (let j = 0; j < g.ny; j++) {
+    for (let i = 0; i < g.nx; i++) {
+      if (!at(i, j)) continue;
+      const x0 = g.x0 + i * g.cell, x1 = x0 + g.cell;
+      const y0 = g.y0 + j * g.cell, y1 = y0 + g.cell;
+      if (!at(i - 1, j)) out.push(x0, y0, x0, y1);
+      if (!at(i + 1, j)) out.push(x1, y0, x1, y1);
+      if (!at(i, j - 1)) out.push(x0, y0, x1, y0);
+      if (!at(i, j + 1)) out.push(x0, y1, x1, y1);
+    }
+  }
+  return out;
+}
