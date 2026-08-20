@@ -226,6 +226,9 @@ button:disabled { opacity: 0.38; cursor: not-allowed; transform: none; box-shado
 
 #btn-brief, #btn-export { font-weight: 600; }
 
+/* The header selector opts out of the flex:1 that suits the sidebar selects. */
+#sel-plan { flex: 0 0 auto; font-weight: 500; margin-right: 4px; }
+
 select {
   flex: 1;
   min-width: 0;

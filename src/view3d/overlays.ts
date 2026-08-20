@@ -13,6 +13,7 @@ import type { RoomGraph, GEdge, Route } from '../analysis/graph';
 import { OUTSIDE } from '../analysis/graph';
 import type { SiteMeshes } from '../geometry/build3d';
 import type { SiteDocument } from '../core/types';
+import { makeLabel, type Label } from './labels';
 
 export const COL = {
   bridge: 0xff4d4d,
@@ -30,14 +31,31 @@ export class Overlays {
   private routeGroup = new THREE.Group();
   private markerGroup = new THREE.Group();
   private selectGroup = new THREE.Group();
+  private labelGroup = new THREE.Group();
+  /**
+   * Live labels, kept so their canvas textures can be released on redraw. Room chips
+   * and marker chips are tracked separately because they are rebuilt by different
+   * calls: disposing one set from the other's redraw would blank sprites still in
+   * the scene.
+   */
+  private roomLabels: Label[] = [];
+  private markerLabels: Label[] = [];
   private baseDoorColour = new Map<string, number>();
+  /** Room-name chips are off by default: they are context, not tactical state. */
+  private roomLabelsOn = false;
+  private lastGraph: RoomGraph | null = null;
+  /**
+   * Plan scale, so a chip stays square when the world group is rescaled. app.ts sets
+   * it on every SET_SCALE, before the overlays are redrawn.
+   */
+  mpu = 1;
 
   constructor(
     group: THREE.Group,
     private site: SiteDocument,
     private meshes: SiteMeshes,
   ) {
-    group.add(this.routeGroup, this.markerGroup, this.selectGroup);
+    group.add(this.routeGroup, this.markerGroup, this.selectGroup, this.labelGroup);
     for (const s of meshes.storeys.values()) {
       for (const [id, m] of s.doors) {
         this.baseDoorColour.set(id, (m.material as THREE.MeshStandardMaterial).color.getHex());
@@ -156,6 +174,8 @@ export class Overlays {
   drawMarkers(markers: Array<{ id: string; storey_id: string; x_u: number; y_u: number; z_m: number; kind: string; label: string }>): void {
     const old = this.markerGroup.children.filter((c) => c.name.startsWith('mk-'));
     for (const o of old) this.markerGroup.remove(o);
+    for (const l of this.markerLabels) l.dispose();
+    this.markerLabels = [];
     for (const m of markers) {
       const g = new THREE.Group();
       g.name = `mk-${m.id}`;
@@ -170,8 +190,49 @@ export class Overlays {
       );
       stem.position.set(m.x_u, this.storeyBase(m.storey_id) + (m.z_m + 0.6) / 2, m.y_u);
       g.add(pin, stem);
+      // The marker's label was carried in the document but never drawn: a pink pin
+      // with no text tells a commander something is there, not what it is.
+      if (m.label.trim()) {
+        const l = makeLabel(m.label, COL.marker, this.mpu);
+        l.sprite.position.set(m.x_u, this.storeyBase(m.storey_id) + m.z_m + 1.5, m.y_u);
+        this.markerLabels.push(l);
+        g.add(l.sprite);
+      }
       this.markerGroup.add(g);
     }
+  }
+
+  /**
+   * Room-name chips, one per room, floating just above head height. Off by default and
+   * driven by the header toggle: on a nineteen-room plan they are useful orientation in
+   * the doll-house and pure clutter in a walkthrough, so the operator decides.
+   * Passing the graph again refreshes them; the previous textures are released first.
+   */
+  drawRoomLabels(gr: RoomGraph): void {
+    this.lastGraph = gr;
+    this.clearLabels();
+    if (!this.roomLabelsOn) return;
+    for (const n of gr.nodes.values()) {
+      if (n.key === OUTSIDE || !n.room_id) continue;
+      const l = makeLabel(n.name, COL.door, this.mpu);
+      l.sprite.position.set(n.centre_u[0], this.storeyBase(n.storey_id) + 2.6, n.centre_u[1]);
+      this.roomLabels.push(l);
+      this.labelGroup.add(l.sprite);
+    }
+  }
+
+  /** Toggle the room chips. Returns the state it settled on, for the button's label. */
+  toggleRoomLabels(on: boolean): boolean {
+    this.roomLabelsOn = on;
+    if (this.lastGraph) this.drawRoomLabels(this.lastGraph);
+    return this.roomLabelsOn;
+  }
+
+  /** Release the room chips. A sprite off the graph still owns its canvas. */
+  private clearLabels(): void {
+    for (const l of this.roomLabels) l.dispose();
+    this.roomLabels = [];
+    this.labelGroup.clear();
   }
 
   /** One box outline around the selected room or door. */

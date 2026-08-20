@@ -15,18 +15,27 @@ import type { SiteDocument, Storey, RoomUse } from '../core/types';
 import { planStorey } from './walls';
 import { roomRects, roomAt, nodeMap, wallSeg, openingCentre, type Grid } from '../core/grid';
 
+/**
+ * Floor tint per room use. Chosen in HSL, not by eye: hues are spread around the wheel
+ * so no two uses read alike (the previous palette had six of eleven within 20 degrees
+ * of each other, all blue-grey), saturation sits near 0.40 so the type is legible at a
+ * glance, and lightness is pinned to 0.27-0.34 so a floor never out-competes the
+ * tactical overlays above it. CORRIDOR and UNKNOWN are deliberately left desaturated:
+ * corridors are connective tissue and UNKNOWN is an absence of information, so neither
+ * should claim attention the way a named room does.
+ */
 export const FLOOR_TINT: Record<RoomUse, number> = {
-  CORRIDOR: 0x4a5568,
-  OFFICE: 0x3f5a4a,
-  SERVER: 0x6b3f3f,
-  STORE: 0x55503f,
-  STAIRWELL: 0x4a4160,
-  HALL: 0x45505c,
-  CLASSROOM: 0x3d5560,
-  PLANT: 0x4a4a42,
-  TOILET: 0x3b4a52,
-  PLATFORM: 0x444e58,
-  UNKNOWN: 0x3f4650,
+  CORRIDOR: 0x495465,
+  OFFICE: 0x2e6b4d,
+  SERVER: 0x762d2f,
+  STORE: 0x6d572c,
+  STAIRWELL: 0x4e3177,
+  HALL: 0x336671,
+  CLASSROOM: 0x2f5774,
+  PLANT: 0x58662e,
+  TOILET: 0x2e615d,
+  PLATFORM: 0x33416c,
+  UNKNOWN: 0x3f444a,
 };
 
 export interface StoreyMeshes {
@@ -189,7 +198,7 @@ export function buildSiteMeshes(doc: SiteDocument, grids: Map<string, Grid>): Si
       const geo = roomFloorGeometry(grid, i, st.elevation_m);
       if (!geo) return;
       const mat = new THREE.MeshStandardMaterial({
-        color: FLOOR_TINT[r.use] ?? 0x4a5568, roughness: 1.0, metalness: 0.0,
+        color: FLOOR_TINT[r.use] ?? FLOOR_TINT.UNKNOWN, roughness: 1.0, metalness: 0.0,
       });
       const mesh = new THREE.Mesh(geo, mat);
       mesh.receiveShadow = true;

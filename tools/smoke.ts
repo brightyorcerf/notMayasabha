@@ -2,7 +2,7 @@
  * Smoke test. Runs the whole derived pipeline headlessly and prints what a judge
  * will be shown. If this is red, do not open the browser.
  */
-import { loadDoc, derive, statusGate } from '../src/core/site';
+import { loadDoc, derive, statusGate, PLANS } from '../src/core/site';
 import { Session } from '../src/core/session';
 import { unscaledRecord, calibrationMpu } from '../src/core/scale';
 import {
@@ -12,7 +12,7 @@ import {
 import { blockedAt } from '../src/core/grid';
 
 const t0 = Date.now();
-const s = new Session(loadDoc());
+const s = new Session(loadDoc('mahindra'));
 const gr = buildRoomGraph(s.doc, s.derived.grids);
 const br = bridges(gr);
 const ap = articulationPoints(gr);
@@ -92,14 +92,42 @@ console.log(`  chain intact: ${s.verifyChain()}`);
 gate = statusGate(s.doc, s.derived.findings, new Set());
 console.log(`  briefing allowed after LOCKED: ${gate.briefingAllowed}`);
 
-const d2 = derive(loadDoc());
+const d2 = derive(loadDoc('mahindra'));
 const fail =
   br.size === 0 || ap.size === 0 ||
   blockedAt(gg, 2.0, 26) || !blockedAt(gg, 2.0, 20) ||
   !route(gr, OUTSIDE, target.key) ||
   !s.verifyChain() ||
   !gate.briefingAllowed ||
-  d2.hash !== derive(loadDoc()).hash;  // determinism: same input, same hash
-console.log(`\n  determinism: ${d2.hash} == ${derive(loadDoc()).hash}`);
-console.log(fail ? '\nSMOKE FAILED\n' : '\nSMOKE OK\n');
-process.exit(fail ? 1 : 0);
+  d2.hash !== derive(loadDoc('mahindra')).hash;  // determinism: same input, same hash
+console.log(`\n  determinism: ${d2.hash} == ${derive(loadDoc('mahindra')).hash}`);
+
+/**
+ * Every bundled plan, checked for the properties that must hold whatever the
+ * blueprint is. The run above is deep but Mahindra-specific — it names rooms and wall
+ * IDs — so it cannot speak for the other plans. This pass names nothing: it asserts
+ * that each plan derives without a blocking finding, extracts rooms, is fully
+ * reachable from the exterior, and hashes the same twice. That is the CLAUDE.md §9
+ * guarantee, applied to every plan the demo can actually load.
+ */
+console.log('\n-- every bundled plan (structural) --');
+let planFail = false;
+for (const p of PLANS) {
+  const d = derive(loadDoc(p.id));
+  const g = buildRoomGraph(loadDoc(p.id), d.grids);
+  const rooms = [...g.nodes.values()].filter((n) => n.key !== OUTSIDE);
+  const unreachable = rooms.filter((n) => !route(g, OUTSIDE, n.key));
+  const gt = statusGate(loadDoc(p.id), d.findings, new Set());
+  const stable = d.hash === derive(loadDoc(p.id)).hash;
+  const ok = rooms.length > 0 && unreachable.length === 0 && gt.blocking.length === 0 && stable;
+  if (!ok) planFail = true;
+  console.log(
+    `  ${ok ? 'OK  ' : 'FAIL'} ${p.id.padEnd(15)} storeys=${d.grids.size} rooms=${String(rooms.length).padStart(2)}` +
+    `  unreachable=${unreachable.length}  blocking=${gt.blocking.length}  hash=${d.hash}${stable ? '' : ' UNSTABLE'}` +
+    `${unreachable.length ? '  [' + unreachable.map((n) => n.name).join(', ') + ']' : ''}`,
+  );
+}
+
+const allFail = fail || planFail;
+console.log(allFail ? '\nSMOKE FAILED\n' : '\nSMOKE OK\n');
+process.exit(allFail ? 1 : 0);

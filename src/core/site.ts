@@ -1,7 +1,7 @@
 /**
  * Document loading, validation and derived state.
  *
- * Takes:   the bundled site fixture, or a document produced by the op log.
+ * Takes:   one of the bundled site fixtures, or a document produced by the op log.
  * Returns: grids, findings, scale checks and a content hash. All derived, never stored.
  * Assumes: the fixture is bundled at build time. Nothing is fetched at run time.
  *          Every Finding carries an anchor, so the 2D view, the 3D view and the
@@ -12,6 +12,7 @@ import type { SiteDocument, Storey, ScaleCheck } from './types';
 import { buildGrid, nodeMap, wallLength, openingStart, type Grid } from './grid';
 import { runChecks, stateFromChecks, displayMpu } from './scale';
 import siteJson from '../../fixtures/site.json';
+import trainingBlockJson from '../../fixtures/site-training-block.json';
 
 export type Severity = 'BLOCKING' | 'WARNING' | 'INFO';
 
@@ -49,8 +50,35 @@ export function contentHash(v: unknown): string {
   return h.toString(16).padStart(8, '0');
 }
 
-export function loadDoc(): SiteDocument {
-  return JSON.parse(JSON.stringify(siteJson)) as SiteDocument;
+/**
+ * The bundled plans, in demo order. Both are compiled in at build time; switching
+ * between them fetches nothing. `mahindra` is the demo hero — a schematic of a real
+ * 2D blueprint. `training-block` is the frozen contract fixture of CLAUDE.md §9 and
+ * the only two-storey plan, so it is what exercises stairs and inter-floor routing.
+ */
+export const PLANS = [
+  { id: 'mahindra', label: 'Mahindra Block', doc: siteJson },
+  { id: 'training-block', label: 'Training Block B', doc: trainingBlockJson },
+] as const;
+
+export type PlanId = (typeof PLANS)[number]['id'];
+
+export const DEFAULT_PLAN: PlanId = 'mahindra';
+
+/** True when `v` names a bundled plan. Callers use it to sanitise external input. */
+export function isPlanId(v: string | null): v is PlanId {
+  return PLANS.some((p) => p.id === v);
+}
+
+/**
+ * Deep-copy the named plan out of the bundle. The copy matters: Session mutates the
+ * document it is handed, and the imported JSON is module-scoped, so handing it out
+ * directly would let one plan's edits survive a switch to the other.
+ */
+export function loadDoc(plan: PlanId = DEFAULT_PLAN): SiteDocument {
+  const entry = PLANS.find((p) => p.id === plan);
+  if (!entry) throw new Error(`unknown plan: ${plan}`);
+  return JSON.parse(JSON.stringify(entry.doc)) as SiteDocument;
 }
 
 /** Graph-language validation. "A gap" is not representable when walls share node IDs. */

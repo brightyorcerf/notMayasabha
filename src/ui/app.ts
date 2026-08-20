@@ -8,7 +8,7 @@
  */
 
 import * as THREE from 'three';
-import { loadDoc, statusGate } from '../core/site';
+import { loadDoc, statusGate, PLANS, DEFAULT_PLAN, isPlanId, type PlanId } from '../core/site';
 import { Session } from '../core/session';
 import { health } from '../core/netguard';
 import { buildSiteMeshes } from '../geometry/build3d';
@@ -31,9 +31,42 @@ import {
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string): T => document.getElementById(id) as T;
 
+/**
+ * Which plan to boot, taken from `?plan=`. Unknown or absent values fall back to the
+ * default rather than throwing: a mistyped URL should still show a building.
+ */
+function planFromUrl(): PlanId {
+  const v = new URLSearchParams(window.location.search).get('plan');
+  return isPlanId(v) ? v : DEFAULT_PLAN;
+}
+
+/**
+ * Populate the plan selector and switch plans by reloading with a new `?plan=`.
+ * A reload rather than an in-place rebuild: boot is a few milliseconds, and tearing
+ * down the viewer, overlays, grids and op log by hand is a whole class of bugs that
+ * a demo cannot afford. The URL also makes the choice shareable and bookmarkable.
+ */
+function installPlanPicker(current: PlanId): void {
+  const sel = $<HTMLSelectElement>('sel-plan');
+  for (const p of PLANS) {
+    const opt = document.createElement('option');
+    opt.value = p.id;
+    opt.textContent = p.label;
+    sel.appendChild(opt);
+  }
+  sel.value = current;
+  sel.addEventListener('change', () => {
+    const url = new URL(window.location.href);
+    url.searchParams.set('plan', sel.value);
+    window.location.assign(url.toString());
+  });
+}
+
 export function start(): void {
   const t0 = performance.now();
-  const S = new Session(loadDoc());
+  const planId = planFromUrl();
+  const S = new Session(loadDoc(planId));
+  installPlanPicker(planId);
   let gr: RoomGraph = buildRoomGraph(S.doc, S.derived.grids);
   let br = bridges(gr);
   let ap = articulationPoints(gr);
@@ -68,12 +101,16 @@ export function start(): void {
     overlays.applyCriticalRooms(ap, gr);
     overlays.drawEntryMarkers(gr);
     overlays.drawMarkers(S.doc.briefing.markers);
+    overlays.drawRoomLabels(gr);
   };
 
   const refresh = (): void => {
     const gate = statusGate(S.doc, S.derived.findings, new Set(S.accepted.keys()));
 
     viewer.mpu = S.derived.mpu;
+    // Labels are sized against the plan scale, so the overlays learn it before the
+    // next redraw; otherwise a recalibration leaves every chip stretched.
+    overlays.mpu = S.derived.mpu;
     viewer.setGrids(S.doc, S.derived.grids);
     $('unscaled-banner').classList.toggle('on', S.derived.unscaled);
 
@@ -349,6 +386,10 @@ export function start(): void {
   $('btn-orbit').onclick = () => {
     setWalkUI(false);
     viewer.enterOrbit();
+  };
+  $('btn-labels').onclick = () => {
+    const on = overlays.toggleRoomLabels(!$('btn-labels').classList.contains('on'));
+    $('btn-labels').classList.toggle('on', on);
   };
   // Esc unlocks the pointer at the browser level even when we never asked for it
   // to. Without this the app was left thinking it was still in WALK mode: WASD kept

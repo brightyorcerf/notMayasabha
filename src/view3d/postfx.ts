@@ -15,6 +15,7 @@ import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { SSAOPass } from 'three/examples/jsm/postprocessing/SSAOPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { NO_GLOW } from './labels';
 
 /**
  * Objects on this layer bloom. The bloom camera renders this layer alone, so bloom is
@@ -160,5 +161,10 @@ export class PostFX {
 
 /** Mark an object and everything under it as a bloom emitter. */
 export function markGlow(root: THREE.Object3D): void {
-  root.traverse((o) => o.layers.enable(GLOW_LAYER));
+  root.traverse((o) => {
+    // Text opts out: bloom turns glyphs into a smear, and a label a commander cannot
+    // read is worse than no label. See view3d/labels.ts.
+    if (o.userData[NO_GLOW]) o.layers.disable(GLOW_LAYER);
+    else o.layers.enable(GLOW_LAYER);
+  });
 }

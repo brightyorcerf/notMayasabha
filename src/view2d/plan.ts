@@ -154,7 +154,7 @@ export class Plan2D {
     st.rooms.forEach((r, i) => {
       const key = nodeKey(st.id, r.id);
       const crit = this.criticalRooms.has(key);
-      ctx.fillStyle = hex(FLOOR_TINT[r.use] ?? 0x4a5568, crit ? 0.95 : 0.7);
+      ctx.fillStyle = hex(FLOOR_TINT[r.use] ?? FLOOR_TINT.UNKNOWN, crit ? 0.95 : 0.7);
       for (const rect of roomRects(g, i)) {
         ctx.fillRect(this.sx(rect.x), this.sy(rect.y), rect.w * this.k + 0.6, rect.h * this.k + 0.6);
       }
