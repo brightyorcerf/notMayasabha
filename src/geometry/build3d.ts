@@ -157,12 +157,14 @@ export function buildSiteMeshes(doc: SiteDocument, grids: Map<string, Grid>): Si
   root.name = 'site';
   const storeys = new Map<string, StoreyMeshes>();
 
-  const wallMatExt = new THREE.MeshStandardMaterial({ color: 0x9aa0a6, roughness: 0.95, metalness: 0.0 });
+  // Roughness pulled in from 0.95: a generated room environment (Viewer §env) now
+  // gives these something to reflect, and 0.95 read as flat-shaded plastic against it.
+  const wallMatExt = new THREE.MeshStandardMaterial({ color: 0x9aa0a6, roughness: 0.72, metalness: 0.0 });
   // storeyInteriorWallGeometry writes a near-white vertex colour lerped toward the
   // adjoining room's floor tint; multiplied against this base grey it shifts hue
   // per room without changing overall brightness.
   const wallMatInt = new THREE.MeshStandardMaterial({
-    color: 0xb8bcc0, roughness: 0.95, metalness: 0.0, vertexColors: true,
+    color: 0xb8bcc0, roughness: 0.72, metalness: 0.0, vertexColors: true,
   });
 
   for (const st of doc.storeys) {
@@ -198,7 +200,7 @@ export function buildSiteMeshes(doc: SiteDocument, grids: Map<string, Grid>): Si
       const geo = roomFloorGeometry(grid, i, st.elevation_m);
       if (!geo) return;
       const mat = new THREE.MeshStandardMaterial({
-        color: FLOOR_TINT[r.use] ?? FLOOR_TINT.UNKNOWN, roughness: 1.0, metalness: 0.0,
+        color: FLOOR_TINT[r.use] ?? FLOOR_TINT.UNKNOWN, roughness: 0.85, metalness: 0.0,
       });
       const mesh = new THREE.Mesh(geo, mat);
       mesh.receiveShadow = true;
@@ -220,7 +222,7 @@ export function buildSiteMeshes(doc: SiteDocument, grids: Map<string, Grid>): Si
       const ux = (seg.bx - seg.ax) / Lw, uy = (seg.by - seg.ay) / Lw;
       const [cx, cy] = openingCentre(o, w, N);
       const geo = new THREE.BoxGeometry(o.width_u, 0.04, w.thickness_u + 0.10);
-      const mat = new THREE.MeshStandardMaterial({ color: 0x8899aa, roughness: 0.8, emissive: 0x000000 });
+      const mat = new THREE.MeshStandardMaterial({ color: 0x8899aa, roughness: 0.6, emissive: 0x000000 });
       const mesh = new THREE.Mesh(geo, mat);
       mesh.position.set(cx, st.elevation_m + 0.03, cy);
       mesh.rotation.y = Math.atan2(-uy, ux);
@@ -240,7 +242,7 @@ export function buildSiteMeshes(doc: SiteDocument, grids: Map<string, Grid>): Si
       }
       const h = Math.max(...st.walls.map((w) => w.height_m));
       const geo = new THREE.BoxGeometry(maxX - minX + 0.5, 0.25, maxY - minY + 0.5);
-      roof = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0x707880, roughness: 1 }));
+      roof = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0x707880, roughness: 0.75 }));
       roof.position.set((minX + maxX) / 2, st.elevation_m + h + 0.125, (minY + maxY) / 2);
       roof.castShadow = true;
       roof.userData = { kind: 'roof', storey: st.id };
@@ -252,7 +254,7 @@ export function buildSiteMeshes(doc: SiteDocument, grids: Map<string, Grid>): Si
   }
 
   // Stairs: a stepped solid. Named in the problem statement, so it is not a coloured prism.
-  const stairMat = new THREE.MeshStandardMaterial({ color: 0x8f86b0, roughness: 0.9 });
+  const stairMat = new THREE.MeshStandardMaterial({ color: 0x8f86b0, roughness: 0.7 });
   for (const s of doc.stairs) {
     const from = doc.storeys.find((x) => x.id === s.from_storey);
     const to = doc.storeys.find((x) => x.id === s.to_storey);

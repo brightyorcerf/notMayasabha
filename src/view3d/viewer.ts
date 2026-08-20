@@ -17,6 +17,8 @@ import { frameBox as fitFrame } from './framing';
 import { PostFX, markGlow } from './postfx';
 import { applyWallRim } from './rim';
 import { TrackingShot } from './tracking';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { skyGradient } from './sky';
 
 export const EYE_M = 1.5;
 const BODY_R = 0.28;
@@ -107,8 +109,20 @@ export class Viewer {
     this.renderer.toneMappingExposure = 1.15;
     el.appendChild(this.renderer.domElement);
 
-    this.scene.background = new THREE.Color(0x0d1117);
+    this.scene.background = skyGradient();
     this.scene.fog = new THREE.Fog(0x0d1117, 60, 220);
+
+    // A generated interior environment, not a photo: MeshStandardMaterial with no
+    // envMap has nothing to reflect and reads as flat-shaded plastic no matter how
+    // good the direct lights are, however many bounces SSAO fakes. PMREMGenerator
+    // pre-filters it once at boot, not per frame. environmentIntensity is a scene-wide
+    // dial (three r160+) so no per-material envMapIntensity bookkeeping is needed, and
+    // it is kept low — this is meant to be felt as ambient occlusion filling in the
+    // shadows one direct light and a fill light miss, not a showroom sheen.
+    const pmrem = new THREE.PMREMGenerator(this.renderer);
+    this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    this.scene.environmentIntensity = 0.35;
+    pmrem.dispose();
 
     this.camera = new THREE.PerspectiveCamera(60, 1, 0.05, 500);
     this.camera.position.set(-18, 22, -16);
@@ -132,7 +146,7 @@ export class Viewer {
 
     const ground = new THREE.Mesh(
       new THREE.PlaneGeometry(600, 600),
-      new THREE.MeshStandardMaterial({ color: 0x1b2027, roughness: 1 }),
+      new THREE.MeshStandardMaterial({ color: 0x1b2027, roughness: 0.82 }),
     );
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = -0.06;
@@ -207,6 +221,10 @@ export class Viewer {
     });
 
     this.resize();
+    // A ResizeObserver, not just window 'resize': the container changes size when a
+    // panel reflows or the page zoom changes, neither of which reliably fires a window
+    // resize. Without it the canvas keeps a stale size until the window itself moves.
+    new ResizeObserver(() => this.resize()).observe(this.el);
     addEventListener('resize', () => this.resize());
     this.renderer.setAnimationLoop(() => this.tick());
   }
@@ -226,9 +244,24 @@ export class Viewer {
     }));
   }
 
+  /**
+   * Match the canvas to its container, in BOTH the drawing buffer and CSS size.
+   *
+   * This used to pass `updateStyle = false`, which sets the drawing buffer to
+   * `w * devicePixelRatio` and then leaves the canvas with no CSS size at all — so the
+   * browser falls back to the buffer dimensions as the element's CSS size. That is only
+   * correct when devicePixelRatio is exactly 1. Anywhere else the canvas is the wrong
+   * size on screen by a factor of dpr: dpr < 1 (a zoomed-out window) leaves a strip of
+   * background down the right and along the bottom where the canvas does not reach, and
+   * dpr > 1 overflows the container and is clipped. It also breaks orbiting, because
+   * OrbitControls scales rotation by `domElement.clientHeight` — a canvas reporting a
+   * height smaller than the area it is stretched over rotates proportionally too fast.
+   * Letting three write the CSS size keeps buffer and element in agreement on every
+   * display.
+   */
   private resize(): void {
     const w = this.el.clientWidth || 1, h = this.el.clientHeight || 1;
-    this.renderer.setSize(w, h, false);
+    this.renderer.setSize(w, h);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     this.fx?.setSize(w, h);

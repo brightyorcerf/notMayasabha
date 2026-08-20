@@ -35,11 +35,16 @@ const AO_MAX_DISTANCE = 0.1;
 /** Occlusion radius in world metres. Contact shading on a ~25 m building. */
 const AO_RADIUS = 1.0;
 
+/** Vignette darkening at the frame edge, 0..1. Folded into MIX_SHADER: it is the
+ *  last thing drawn before OutputPass, so adding it here costs no extra pass. */
+const VIGNETTE_STRENGTH = 0.38;
+
 const MIX_SHADER = {
   uniforms: {
     tDiffuse: { value: null as THREE.Texture | null },
     bloomTexture: { value: null as THREE.Texture | null },
     strength: { value: 1.0 },
+    vignette: { value: VIGNETTE_STRENGTH },
   },
   vertexShader: /* glsl */ `
     varying vec2 vUv;
@@ -52,11 +57,29 @@ const MIX_SHADER = {
     uniform sampler2D tDiffuse;
     uniform sampler2D bloomTexture;
     uniform float strength;
+    uniform float vignette;
     varying vec2 vUv;
+
+    // Interleaved gradient noise (Jimenez 2014). One dot product, no texture lookup —
+    // cheap enough to run on every pixel, every frame.
+    float dither(vec2 co) {
+      return fract(52.9829189 * fract(dot(co, vec2(0.06711056, 0.00583715))));
+    }
+
     void main() {
       vec4 base = texture2D(tDiffuse, vUv);
       vec4 glow = texture2D(bloomTexture, vUv);
-      gl_FragColor = vec4(base.rgb + glow.rgb * strength, base.a);
+      vec3 lit = base.rgb + glow.rgb * strength;
+      float d = length(vUv - 0.5);
+      float shade = 1.0 - vignette * smoothstep(0.35, 0.85, d);
+      // Break up 8-bit banding on the large, near-flat floors the new environment
+      // reflection and vignette both grade smoothly across — a wide, faintly lit
+      // room-tinted floor is exactly the surface a subtle gradient bands visibly on,
+      // and how visible it is depends on that room's own colour, hence "some rooms
+      // more than others." One LSB of noise is imperceptible as noise but erases the
+      // step edges between adjacent colour bands.
+      float noise = (dither(gl_FragCoord.xy) - 0.5) / 255.0;
+      gl_FragColor = vec4(lit * shade + noise, base.a);
     }
   `,
 };

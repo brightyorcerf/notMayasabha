@@ -62,18 +62,7 @@ function installPlanPicker(current: PlanId): void {
   });
 }
 
-/**
- * The small-viewport notice dismisses to a body class, not to storage: CLAUDE.md §6
- * forbids localStorage, and a warning that has to be re-read on the next visit is the
- * correct behaviour for a warning about the device you are holding.
- */
-function installViewportNotice(): void {
-  const btn = document.getElementById('ts-dismiss');
-  if (btn) btn.onclick = () => document.body.classList.add('ts-ok');
-}
-
 export function start(): void {
-  installViewportNotice();
   const t0 = performance.now();
   const planId = planFromUrl();
   const S = new Session(loadDoc(planId));

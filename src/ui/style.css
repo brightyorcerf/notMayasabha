@@ -762,8 +762,9 @@ button.tiny { padding: 4px 8px; font-size: 10.5px; font-weight: 500; }
 
 /*
  * Hidden by default and revealed only by the media query below, so a desktop user
- * never pays for it. `body.ts-ok` is set by the dismiss button and wins over the
- * query — nothing is ever hard-blocked, it is a warning, not a gate.
+ * never pays for it. There is no dismiss: below this width the app is not a degraded
+ * experience, it is a non-functional one (hover, scroll-zoom, WASD, pointer lock all
+ * assume a mouse and a keyboard), so this is a hard stop, not a warning.
  */
 #too-small { display: none; }
 
@@ -778,16 +779,14 @@ button.tiny { padding: 4px 8px; font-size: 10.5px; font-weight: 500; }
     padding: 24px;
     background: var(--bg);
   }
-  body.ts-ok #too-small { display: none; }
 }
 
 .ts-card {
-  max-width: 460px;
   text-align: center;
   background: var(--panel);
   border: 1px solid var(--line-strong);
   border-radius: var(--r-panel);
-  padding: 34px 30px 28px;
+  padding: 34px 40px;
   box-shadow: 0 20px 60px -24px rgba(17, 34, 64, 0.35);
 }
 .ts-mark {
@@ -798,18 +797,7 @@ button.tiny { padding: 4px 8px; font-size: 10.5px; font-weight: 500; }
 .ts-card h1 {
   font: 600 19px/1.25 var(--sans);
   color: var(--text);
-  margin: 0 0 12px;
-}
-.ts-card p {
-  font: 400 13.5px/1.6 var(--sans);
-  color: var(--text-2);
-  margin: 0 0 12px;
-}
-.ts-card .ts-hint {
-  font-family: var(--mono);
-  font-size: 11.5px;
-  color: var(--faint);
-  margin-bottom: 20px;
+  margin: 0;
 }
 
 /* ─────────────────────────────  show-more lists  ──────────────────────────── */
