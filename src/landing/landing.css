@@ -1,0 +1,498 @@
+/**
+ * Landing page styling. The front door, not the instrument.
+ *
+ * Takes:   the markup in index.html only. It shares nothing with src/ui/style.css.
+ * Returns: a committed dark page that reads as the same system as the workstation's
+ *          dark viewports, so entering the app is a step inward rather than a jump.
+ * Assumes: no network at runtime, exactly as the app assumes. The one webfont is the
+ *          same VT323 the shell vendors; every other face is a system stack, and there
+ *          is no script on this page at all — the hero animates in CSS.
+ */
+
+@font-face {
+  font-family: "Mapped";
+  src: url("../ui/assets/fonts/VT323-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  color-scheme: dark;
+
+  /* The viewport colour the 3D canvas paints, used here as the page ground. */
+  --ink: #0b0f15;
+  --ink-2: #10161f;
+  --card: rgba(255, 255, 255, 0.028);
+  --line: rgba(150, 190, 220, 0.11);
+  --line-2: rgba(150, 190, 220, 0.2);
+
+  --text: #e8f0f7;
+  --text-2: #a8b8c8;
+  --dim: #74849a;
+
+  --accent: #00e5ff;
+  --accent-2: #38bdf8;
+  --accent-soft: rgba(0, 229, 255, 0.09);
+
+  --sans: "Avenir Next", "Segoe UI Variable Text", "Segoe UI", system-ui,
+    -apple-system, sans-serif;
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", "IBM Plex Mono", Menlo, monospace;
+  --pixel: "Mapped", var(--mono);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--ink);
+  color: var(--text);
+  font: 400 15px/1.6 var(--sans);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* The same grain the workstation carries, at half strength. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  pointer-events: none;
+  opacity: 0.26;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='140' height='140' filter='url(%23n)' opacity='0.4'/></svg>");
+}
+
+/* One light source, top-left of the hero. Everything else is unlit. */
+.glow {
+  position: fixed;
+  inset: -30% -10% auto -30%;
+  height: 130vh;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(52% 46% at 26% 22%, rgba(0, 160, 200, 0.17), transparent 68%),
+    radial-gradient(44% 40% at 74% 10%, rgba(70, 110, 220, 0.12), transparent 66%);
+}
+
+main, .nav, footer { position: relative; z-index: 1; }
+
+/* ───────────────────────────────  nav  ─────────────────────────────── */
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  max-width: 1220px;
+  margin: 0 auto;
+  padding: 22px 32px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  text-decoration: none;
+  color: var(--text);
+}
+.brand img {
+  height: 34px;
+  width: auto;
+  display: block;
+  border-radius: 7px;
+  box-shadow: 0 0 0 1px var(--line-2), 0 4px 14px -6px rgba(0, 0, 0, 0.8);
+}
+.brand span {
+  font-family: var(--pixel);
+  font-size: 21px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.nav-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.tag {
+  font: 500 10.5px var(--sans);
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--dim);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 4px 11px;
+}
+
+/* ─────────────────────────────  buttons  ───────────────────────────── */
+
+.cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  text-decoration: none;
+  color: #04151c;
+  background: linear-gradient(180deg, #7ff0ff, var(--accent));
+  border-radius: 999px;
+  padding: 13px 24px;
+  font: 600 14px var(--sans);
+  letter-spacing: 0.01em;
+  box-shadow:
+    0 0 0 1px rgba(0, 229, 255, 0.5),
+    0 10px 30px -12px rgba(0, 229, 255, 0.75),
+    0 1px 0 rgba(255, 255, 255, 0.5) inset;
+  transition: transform 200ms cubic-bezier(0.2, 0.7, 0.3, 1),
+              box-shadow 200ms ease, filter 200ms ease;
+}
+.cta:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.06);
+  box-shadow:
+    0 0 0 1px rgba(0, 229, 255, 0.7),
+    0 18px 44px -14px rgba(0, 229, 255, 0.9),
+    0 1px 0 rgba(255, 255, 255, 0.5) inset;
+}
+.cta:active { transform: translateY(0); }
+.cta.small { padding: 8px 16px; font-size: 12.5px; }
+.cta svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 200ms cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+.cta:hover svg { transform: translateX(3px); }
+
+.ghost {
+  color: var(--text-2);
+  text-decoration: none;
+  font: 500 12.5px var(--sans);
+  border-bottom: 1px solid transparent;
+  transition: color 180ms ease, border-color 180ms ease;
+}
+.ghost:hover { color: var(--text); border-bottom-color: var(--line-2); }
+.ghost.big { font-size: 14px; padding: 13px 4px; }
+
+/* ─────────────────────────────── hero  ─────────────────────────────── */
+
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 0.86fr) minmax(0, 1.14fr);
+  gap: 48px;
+  align-items: center;
+  max-width: 1220px;
+  margin: 0 auto;
+  padding: 52px 32px 72px;
+}
+
+.eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0 0 22px;
+  font: 500 11px var(--sans);
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+/* A live indicator, not a decorative dot: it is the one thing on the page that moves
+   on its own, and it is attached to the claim the whole project is built on. */
+.eyebrow i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 0 rgba(0, 229, 255, 0.55);
+  animation: pulse 2.4s ease-out infinite;
+}
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(0, 229, 255, 0.5); }
+  70% { box-shadow: 0 0 0 11px rgba(0, 229, 255, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(0, 229, 255, 0); }
+}
+
+h1 {
+  margin: 0 0 20px;
+  font: 600 clamp(38px, 4.6vw, 62px)/1.04 var(--sans);
+  letter-spacing: -0.03em;
+}
+h1 em {
+  font-style: normal;
+  background: linear-gradient(105deg, #8ef4ff, var(--accent) 42%, var(--accent-2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.lede {
+  margin: 0 0 30px;
+  max-width: 46ch;
+  color: var(--text-2);
+  font-size: 15.5px;
+  line-height: 1.72;
+}
+.lede b { color: var(--text); font-weight: 600; }
+
+.row { display: flex; align-items: center; gap: 22px; flex-wrap: wrap; }
+
+.foot-note {
+  margin: 26px 0 0;
+  font: 400 11.5px var(--mono);
+  color: var(--dim);
+  letter-spacing: 0.01em;
+}
+
+/* ──────────────────────────  hero animation  ───────────────────────── */
+
+.hero-art { position: relative; }
+
+#hero-art {
+  width: 100%;
+  height: auto;
+  display: block;
+  overflow: visible;
+}
+
+/* The plan pane. Room rects sit under the wall centrelines, exactly as in the app. */
+.plan .pr {
+  fill: rgba(120, 190, 220, 0.06);
+  stroke: rgba(120, 190, 220, 0.2);
+  stroke-width: 1.1;
+  opacity: 0;
+  animation: fade-in 900ms ease forwards;
+  animation-delay: 2.1s;
+}
+.plan .pw {
+  stroke: var(--accent);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 5px rgba(0, 229, 255, 0.45));
+  stroke-dasharray: var(--len) var(--len);
+  stroke-dashoffset: var(--len);
+  animation: draw 700ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  animation-delay: calc(var(--i) * 90ms);
+}
+@keyframes draw { to { stroke-dashoffset: 0; } }
+@keyframes fade-in { to { opacity: 1; } }
+
+/* Dimension line under the plan: the document is measured, and says so. */
+.plan .dim {
+  stroke: rgba(120, 190, 220, 0.34);
+  stroke-width: 1;
+  stroke-dasharray: 3 4;
+  opacity: 0;
+  animation: fade-in 800ms ease forwards;
+  animation-delay: 2.2s;
+}
+
+.arrow {
+  stroke: rgba(0, 229, 255, 0.7);
+  fill: rgba(0, 229, 255, 0.7);
+  stroke-width: 2.4;
+  filter: drop-shadow(0 0 8px rgba(0, 229, 255, 0.5));
+  stroke-linecap: round;
+  opacity: 0;
+  animation: arrow-in 800ms ease forwards;
+  animation-delay: 2.0s;
+}
+@keyframes arrow-in {
+  from { opacity: 0; transform: translateX(-14px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Floors land flat first — the plan, in perspective, before it has any height. */
+.model .fl {
+  fill: rgba(96, 132, 164, 0.26);
+  stroke: rgba(140, 200, 230, 0.2);
+  stroke-width: 1;
+  opacity: 0;
+  animation: fade-in 700ms ease forwards;
+  animation-delay: calc(2.3s + var(--i, 0) * 40ms);
+}
+
+/* Then the walls rise, far to near — the same order the app's clip plane reveals. */
+.model .w {
+  stroke: rgba(190, 220, 240, 0.22);
+  stroke-width: 0.9;
+  stroke-linejoin: round;
+  opacity: 0;
+  transform: translateY(26px);
+  animation: rise 780ms cubic-bezier(0.16, 0.9, 0.24, 1) forwards;
+  animation-delay: calc(2.75s + var(--i) * 62ms);
+}
+/* Isometric shading: faces along X catch the light, faces along Y fall away. */
+.model .wx { fill: rgba(196, 212, 228, 0.9); }
+.model .wy { fill: rgba(142, 162, 184, 0.9); }
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(26px); }
+  to { opacity: 1; transform: none; }
+}
+
+.model .cap {
+  stroke: rgba(0, 229, 255, 0.75);
+  stroke-width: 1.15;
+  stroke-linecap: round;
+  opacity: 0;
+  animation: fade-in 520ms ease forwards;
+  animation-delay: calc(2.9s + var(--i) * 62ms);
+}
+
+/* The sweep line, angled along the isometric axis. One pass, as the walls come up. */
+.scan {
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 12px rgba(0, 229, 255, 0.9));
+  opacity: 0;
+  animation: sweep 2.1s cubic-bezier(0.4, 0, 0.3, 1) forwards;
+  animation-delay: 2.7s;
+}
+@keyframes sweep {
+  0% { opacity: 0; transform: translateY(120px); }
+  16% { opacity: 0.95; }
+  84% { opacity: 0.6; }
+  100% { opacity: 0; transform: translateY(-90px); }
+}
+
+.art-labels {
+  position: absolute;
+  inset: auto 0 -2px 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 0 6px;
+}
+.al {
+  font: 400 10.5px var(--mono);
+  letter-spacing: 0.02em;
+  color: var(--dim);
+  opacity: 0;
+  animation: fade-in 900ms ease forwards;
+}
+.al.l { animation-delay: 1.6s; }
+.al.r { animation-delay: 4.6s; }
+
+/* ─────────────────────────────  stats  ─────────────────────────────── */
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  max-width: 1220px;
+  margin: 0 auto;
+  padding: 0 32px;
+}
+.stats div {
+  padding: 26px 24px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  box-shadow: 1px 0 0 var(--line);
+}
+.stats div:last-child { box-shadow: none; }
+.stats b {
+  display: block;
+  font-family: var(--pixel);
+  font-size: 38px;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: var(--accent);
+  margin-bottom: 9px;
+}
+.stats span {
+  color: var(--dim);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+/* ────────────────────────────  pillars  ────────────────────────────── */
+
+.pillars {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  max-width: 1220px;
+  margin: 0 auto;
+  padding: 72px 32px;
+}
+.pillars article {
+  padding: 30px 28px 32px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  transition: border-color 240ms ease, background 240ms ease, transform 240ms ease;
+}
+.pillars article:hover {
+  border-color: var(--line-2);
+  background: rgba(255, 255, 255, 0.045);
+  transform: translateY(-3px);
+}
+.pillars h3 {
+  margin: 0 0 14px;
+  font: 600 17px/1.3 var(--sans);
+  letter-spacing: -0.015em;
+}
+.pillars p { margin: 0; color: var(--text-2); font-size: 13.8px; line-height: 1.72; }
+.pillars b { color: var(--text); font-weight: 600; }
+
+/* ─────────────────────────────  quote  ─────────────────────────────── */
+
+.quote {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 40px 32px 96px;
+  text-align: center;
+}
+blockquote {
+  margin: 0 0 34px;
+  font: 400 clamp(19px, 2.1vw, 25px)/1.5 var(--sans);
+  letter-spacing: -0.018em;
+  color: var(--text);
+}
+blockquote em {
+  font-style: normal;
+  color: var(--accent);
+}
+
+/* ─────────────────────────────  footer  ────────────────────────────── */
+
+footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+  max-width: 1220px;
+  margin: 0 auto;
+  padding: 26px 32px 44px;
+  border-top: 1px solid var(--line);
+  color: var(--dim);
+  font: 400 11.5px var(--mono);
+}
+
+/* ────────────────────────────  narrow  ─────────────────────────────── */
+
+@media (max-width: 940px) {
+  .hero { grid-template-columns: 1fr; gap: 34px; padding-bottom: 48px; }
+  .stats { grid-template-columns: repeat(2, 1fr); }
+  .stats div:nth-child(2) { box-shadow: none; }
+  .pillars { grid-template-columns: 1fr; padding: 48px 32px; }
+  .nav .tag, .nav .ghost { display: none; }
+}
+
+/* An explicit request for less motion gets the finished frame, not a faster one. */
+@media (prefers-reduced-motion: reduce) {
+  .plan .pw, .plan .pr, .arrow, .model .fl, .model .w, .model .cap, .al {
+    animation: none;
+    opacity: 1;
+    transform: none;
+    stroke-dashoffset: 0;
+  }
+  .scan, .eyebrow i { animation: none; opacity: 0; }
+  .cta, .pillars article { transition: none; }
+}

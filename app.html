@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- Declared before the stylesheet loads, so Chrome's Auto Dark Mode never
+         inverts this deliberately-light shell on first paint. -->
+    <meta name="color-scheme" content="light" />
+    <title>notMayasabha: 2d to 3d</title>
+    <link rel="icon" type="image/png" href="./src/ui/assets/logo.png" />
+    <link rel="stylesheet" href="./src/ui/style.css" />
+  </head>
+  <body class="booting">
+    <!--
+      Shown only on viewports too small or too touch-oriented to run this. The app is a
+      three-column workstation driven by hover, scroll-zoom, WASD and pointer lock; on a
+      phone it is not a degraded experience, it is a non-functional one. Saying so is
+      more honest than letting a judge open it on a handset and see a broken layout.
+    -->
+    <div id="too-small">
+      <div class="ts-card">
+        <img class="ts-mark" src="./src/ui/assets/logo.png" alt="NotMayasabha" />
+        <h1>Designed for desktop.</h1>
+      </div>
+    </div>
+
+    <header id="topbar">
+      <div class="brand">
+        <img class="mark" src="./src/ui/assets/logo.png" alt="" />
+        <div>
+          <div class="name">NotMayasabha</div>
+          <div class="sub">2D blueprint → tactical 3D walkthrough · SIH1773 · NSG</div>
+        </div>
+      </div>
+      <div class="badges">
+        <span class="badge" id="badge-net">SEALED · 0 outbound</span>
+        <span class="badge" id="badge-scale">SCALE</span>
+        <span class="badge" id="badge-status">DRAFT</span>
+        <span class="badge mono" id="badge-hash">—</span>
+        <span class="badge mono" id="badge-fps">— fps</span>
+      </div>
+      <div class="actions">
+        <select id="sel-plan" title="Switch the loaded blueprint"></select>
+        <button id="btn-orbit" class="on">Doll-house</button>
+        <button id="btn-walk">Walkthrough</button>
+        <button id="btn-labels">Labels</button>
+        <button id="btn-brief">Briefing Mode</button>
+        <button id="btn-export">Export GLB</button>
+      </div>
+    </header>
+
+    <main>
+      <section id="left">
+        <div class="panel-head">
+          <span>2D PLAN</span>
+          <span class="storey-tabs" id="storey-tabs"></span>
+        </div>
+        <canvas id="plan" title="Scroll to zoom · double-click to reset"></canvas>
+        <div id="plan-mode"></div>
+
+        <div class="panel-head"><span>SCALE</span><span class="hint" id="scale-state"></span></div>
+        <div id="scale"></div>
+
+        <div class="panel-head">
+          <span>REVIEW &amp; STATUS GATE</span>
+          <span class="hint" id="gate-hint"></span>
+        </div>
+        <div id="findings"></div>
+        <div class="row" id="status-row">
+          <button id="btn-review">Mark REVIEWED</button>
+          <button id="btn-lock">LOCK for briefing</button>
+        </div>
+
+        <div class="panel-head"><span>MANUAL PARAMETERS</span><span class="hint" id="param-source"></span></div>
+        <div id="params"></div>
+      </section>
+
+      <section id="centre">
+        <div id="view3d"></div>
+        <div id="unscaled-banner">UNSCALED MODEL — NOT FOR TACTICAL USE</div>
+        <div id="no-route-banner">NO ROUTE — SELECTED SPACES ARE DISCONNECTED</div>
+        <div id="walk-caption"></div>
+
+        <!--
+          The boot assembly caption. Present in the markup rather than injected so the
+          first frame after the bundle parses already has it laid out — a caption that
+          pops in one frame late is worse than no caption at all.
+        -->
+        <div id="assembly">
+          <div class="a-bar"><i id="a-bar-fill"></i></div>
+          <div class="a-row">
+            <span class="a-label" id="a-label">BLUEPRINT</span>
+            <span class="a-detail" id="a-detail">reading the plan</span>
+          </div>
+          <button id="a-skip" title="Skip the assembly sequence">Skip</button>
+        </div>
+        <div id="hud">
+          <div id="hud-room">—</div>
+          <div id="hud-help">Click <b>Walkthrough</b>, then WASD to move, mouse to look, Shift to run, Esc to release the pointer.</div>
+        </div>
+        <div id="briefing">
+          <div class="b-step" id="b-step">1 / 5</div>
+          <div class="b-title" id="b-title"></div>
+          <div class="b-body" id="b-body"></div>
+          <div class="b-nav">← → to step · Esc to leave</div>
+        </div>
+      </section>
+
+      <section id="right">
+        <div class="panel-head"><span>TACTICAL LAYER</span></div>
+        <div class="row">
+          <label>From</label>
+          <select id="sel-from"></select>
+        </div>
+        <div class="row">
+          <label>To</label>
+          <select id="sel-to"></select>
+        </div>
+        <div class="row">
+          <label>Pace</label>
+          <select id="sel-pace" title="Movement profile: planning estimates, not doctrine"></select>
+        </div>
+        <div class="row">
+          <button id="btn-route" class="wide">Compute route</button>
+        </div>
+        <div id="route-out"></div>
+        <div class="row" id="route-actions">
+          <button id="btn-walk-route" disabled>Animated walkthrough</button>
+          <button id="btn-save-route">Save to briefing</button>
+        </div>
+
+        <div class="panel-head"><span>CRITICAL DOORS <em>(bridges)</em></span></div>
+        <div id="bridges"></div>
+
+        <div class="panel-head"><span>CRITICAL ROOMS <em>(articulation points)</em></span></div>
+        <div id="critical"></div>
+
+        <div class="panel-head"><span>SELECTION</span></div>
+        <div id="selection">Nothing selected. Click a room or a door, in either view.</div>
+        <div class="row" id="sel-actions"></div>
+
+        <div class="panel-head">
+          <span>AUDIT LOG <em>(ops.jsonl)</em></span>
+          <span class="hint" id="chain-state"></span>
+        </div>
+        <div class="row">
+          <button id="btn-undo">Undo</button>
+          <button id="btn-export-ops">Export log</button>
+        </div>
+        <div id="ops"></div>
+
+        <div class="panel-head"><span>MEASURED SUPERVISION</span><span class="hint" title="Corrective ops only. Accepts and status changes are excluded, so the number cannot fall simply because the operator clicked accept more often. Times are clamped at 30 s per op.">what counts ⓘ</span></div>
+        <div id="metrics"></div>
+
+        <div class="panel-head"><span>VIEW</span></div>
+        <div id="toggles"></div>
+
+        <div class="panel-head"><span>OFFLINE POSTURE</span></div>
+        <div id="netlog"></div>
+      </section>
+    </main>
+
+    <!--
+      Failsafe. `booting` on <body> hides the panels so the assembly sequence can hold
+      the whole frame; the sequence clears it at ~5.8 s. If the module bundle throws
+      before it ever runs — a WebGL context refused, a malformed fixture — the operator
+      would be left staring at a blank shell with no way to reach the controls. This
+      strips the class on any uncaught error, and unconditionally after 12 s. It is a
+      recovery path, not an error handler: nothing is swallowed and the error still
+      reaches the console.
+    -->
+    <script>
+      (function () {
+        var clear = function () { document.body.classList.remove('booting'); };
+        addEventListener('error', clear);
+        addEventListener('unhandledrejection', clear);
+        setTimeout(clear, 12000);
+      })();
+    </script>
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>

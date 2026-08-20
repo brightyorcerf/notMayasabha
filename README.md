@@ -7,9 +7,23 @@ entirely in the browser, with no server and no internet connection required.
 
 ```bash
 npm install
-npm run dev        # http://127.0.0.1:5173
+npm run dev        # http://127.0.0.1:5173        landing page
+                   # http://127.0.0.1:5173/app.html   the workstation
 npm run test-all   # types, layer lint, fixture, headless pipeline, production build
 ```
+
+Two pages. `/` is the landing — a script-free page whose hero animates in CSS alone.
+`/app.html` is the workstation. Useful query parameters, all on `/app.html`:
+
+| Parameter | Effect |
+|---|---|
+| `?plan=mahindra` / `?plan=standard` | Which bundled blueprint to boot |
+| `?boot=0` | Skip the assembly sequence and open on the finished model |
+| `?boot=1` | Force the sequence even where the OS asks for reduced motion |
+
+With no `boot` parameter the sequence defers to `prefers-reduced-motion`. A laptop with
+Reduce Motion switched on will not play it — check this on the demo machines, and use
+`?boot=1` if you want it regardless.
 
 Built for the problem "Conversion of 2D Blueprints into 3D Model" (SIH1773): take a 2D
 floor plan plus a few manual parameters (length, breadth, height, staircase, entry/exit),
@@ -54,6 +68,29 @@ building is the worst output this system can produce, so the system is built to 
 
 None of this needs a neural network. It needs the floor plan to become a graph instead
 of a picture — and once it's a graph, graph theory is free.
+
+---
+
+## The assembly sequence
+
+`/app.html` boots by building itself, once, in about 6.5 seconds — `src/view3d/assembly.ts`
+plus the DOM wiring in `src/ui/bootSequence.ts`. Five captioned phases, in the order the
+pipeline actually derives them:
+
+| Phase | What moves | What it is showing |
+|---|---|---|
+| **BLUEPRINT** | Straight down over the floors, walls fully clipped away | A blueprint is a top-down document. The third dimension has to be earned |
+| **EXTRUDING** | A world-space clipping plane sweeps up while the camera arcs to the hero angle | Wall centrelines panelised into solids, floor by floor |
+| **OPENINGS** | Door slabs iris open, innermost first | Openings placed by `anchor` + `offset_u`, never a normalised position |
+| **FLOOR GRAPH** | The tactical overlay group swells in over the finished solid | Bridges, articulation points and betweenness landing on top of the geometry |
+| **READY** | Camera settles; the panels stagger in around the building | The workstation assembles around the model, not the other way round |
+
+It is purely presentational. It reads the built meshes, never the document, appends no
+ops, and hands every material and transform back exactly as it found them. `?boot=0` and
+a `prefers-reduced-motion` preference both skip it entirely, so nothing downstream may
+depend on it having run. Post-processing is suspended for the duration — SSAO renders
+depth through an override material that ignores per-material clipping planes, so a
+half-risen wall would otherwise cast contact shading for its full height into empty air.
 
 ---
 
@@ -130,6 +167,9 @@ Every colour in the 3D view is a computed property of the room graph, drawn in
 ## Layout
 
 ```
+index.html                    the landing page (no script, CSS-only hero animation)
+app.html                      the workstation
+src/landing/landing.css       landing styling; shares nothing with the app shell
 fixtures/site.json            the frozen contract everything is built against
 fixtures/neighbourhood.json   offline area pack (OSM schema)
 src/core/                     schema, occupancy grid, scale engine, ops, session, netguard
@@ -137,7 +177,7 @@ src/geometry/                 wall panelisation, three.js mesh generation
 src/analysis/                 room graph and the analysers
 src/geo/                      neighbourhood extrusion
 src/view2d/  src/view3d/      canvas plan, viewer, overlays
-src/ui/                       panels, wiring, briefing, export
+src/ui/                       panels, wiring, briefing, export, boot sequence
 tools/                        fixture check, layer lint, headless smoke test
 ```
 
