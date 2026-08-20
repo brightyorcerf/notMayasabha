@@ -1,5 +1,7 @@
 # NotMayasabha
 
+![The workstation: 2D plan, doll-house 3D view with a computed tactical route, critical doors and rooms panel](docs/media/screenshot.png)
+
 **Live demo: [notmayasabha.vercel.app](https://notmayasabha.vercel.app)**
 
 A 2D building blueprint becomes an offline, correctable, tactical 3D walkthrough —
