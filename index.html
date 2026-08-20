@@ -3,183 +3,149 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <!-- The landing is a committed dark design; declaring it stops Chrome's Auto Dark
-         Mode from touching it, exactly as the light workstation shell declares light. -->
-    <meta name="color-scheme" content="dark" />
-    <title>NotMayasabha — 2D blueprint to tactical 3D</title>
-    <meta name="description" content="A 2D building blueprint becomes an offline, correctable, tactical 3D walkthrough. Entirely in the browser, with no server and no internet connection." />
-    <meta property="og:title" content="NotMayasabha" />
-    <meta property="og:description" content="A 2D blueprint becomes a verified floor graph, then a tactical 3D walkthrough. Offline, deterministic, in the browser." />
-    <meta property="og:image" content="./src/ui/assets/logo.png" />
-    <meta property="og:type" content="website" />
+    <!-- Declared before the stylesheet loads, so Chrome's Auto Dark Mode never
+         inverts this deliberately-light shell on first paint. -->
+    <meta name="color-scheme" content="light" />
+    <title>notMayasabha: 2d to 3d</title>
     <link rel="icon" type="image/png" href="./src/ui/assets/logo.png" />
-    <link rel="stylesheet" href="./src/landing/landing.css" />
+    <link rel="stylesheet" href="./src/ui/style.css" />
   </head>
   <body>
-    <div class="glow" aria-hidden="true"></div>
+    <!--
+      Shown only on viewports too small or too touch-oriented to run this. The app is a
+      three-column workstation driven by hover, scroll-zoom, WASD and pointer lock; on a
+      phone it is not a degraded experience, it is a non-functional one. Saying so is
+      more honest than letting a judge open it on a handset and see a broken layout.
+    -->
+    <div id="too-small">
+      <div class="ts-card">
+        <img class="ts-mark" src="./src/ui/assets/logo.png" alt="NotMayasabha" />
+        <h1>Designed for desktop.</h1>
+      </div>
+    </div>
 
-    <header class="nav">
-      <a class="brand" href="./index.html">
-        <img src="./src/ui/assets/logo.png" alt="" />
-        <span>NotMayasabha</span>
-      </a>
-      <nav class="nav-right">
-        <span class="tag">SIH1773</span>
-        <a class="ghost" href="./app.html?boot=0">Skip the intro</a>
-        <a class="cta small" href="./app.html">Open workstation</a>
-      </nav>
+    <header id="topbar">
+      <div class="brand">
+        <img class="mark" src="./src/ui/assets/logo.png" alt="" />
+        <div>
+          <div class="name">NotMayasabha</div>
+          <div class="sub">2D blueprint → tactical 3D walkthrough · SIH1773 · NSG</div>
+        </div>
+      </div>
+      <div class="badges">
+        <span class="badge" id="badge-net">SEALED · 0 outbound</span>
+        <span class="badge" id="badge-scale">SCALE</span>
+        <span class="badge" id="badge-status">DRAFT</span>
+        <span class="badge mono" id="badge-hash">—</span>
+        <span class="badge mono" id="badge-fps">— fps</span>
+      </div>
+      <div class="actions">
+        <select id="sel-plan" title="Switch the loaded blueprint"></select>
+        <button id="btn-orbit" class="on">Doll-house</button>
+        <button id="btn-walk">Walkthrough</button>
+        <button id="btn-labels">Labels</button>
+        <button id="btn-brief">Briefing Mode</button>
+        <button id="btn-export">Export GLB</button>
+      </div>
     </header>
 
     <main>
-      <section class="hero">
-        <div class="hero-copy">
-          <p class="eyebrow"><i></i> Offline · deterministic · no model in the geometry path</p>
-          <h1>A blueprint you can <em>interrogate</em>.</h1>
-          <p class="lede">
-            Extruding walls from a floor plan is a rendering problem with a fixed answer.
-            Everything after extrusion here is a <b>derivation</b> — a checkable
-            mathematical result, not a rendered guess. Rooms become a graph, doors become
-            edges, and graph theory answers the questions a commander actually asks.
-          </p>
-          <div class="row">
-            <a class="cta" href="./app.html">
-              Watch it assemble
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
-            </a>
-            <a class="ghost big" href="./app.html?boot=0">Go straight to the model</a>
-          </div>
-          <p class="foot-note">Desktop only. Driven by scroll-zoom, WASD and pointer lock.</p>
+      <section id="left">
+        <div class="panel-head">
+          <span>2D PLAN</span>
+          <span class="storey-tabs" id="storey-tabs"></span>
+        </div>
+        <canvas id="plan" title="Scroll to zoom · double-click to reset"></canvas>
+        <div id="plan-mode"></div>
+
+        <div class="panel-head"><span>SCALE</span><span class="hint" id="scale-state"></span></div>
+        <div id="scale"></div>
+
+        <div class="panel-head">
+          <span>REVIEW &amp; STATUS GATE</span>
+          <span class="hint" id="gate-hint"></span>
+        </div>
+        <div id="findings"></div>
+        <div class="row" id="status-row">
+          <button id="btn-review">Mark REVIEWED</button>
+          <button id="btn-lock">LOCK for briefing</button>
         </div>
 
-        <div class="hero-art">
-          <svg id="hero-art" viewBox="0 0 900 400" role="img"
-           aria-label="A 2D floor plan on the left resolving into an extruded isometric model on the right.">
-        <!-- left: the document. Wall centrelines stroke themselves on. -->
-        <g class="plan">
-          <rect class="pr" x="34.0" y="112.0" width="110.0" height="110.0"/>
-          <rect class="pr" x="144.0" y="112.0" width="154.0" height="110.0"/>
-          <rect class="pr" x="34.0" y="222.0" width="110.0" height="66.0"/>
-          <rect class="pr" x="144.0" y="222.0" width="66.0" height="66.0"/>
-          <rect class="pr" x="210.0" y="222.0" width="88.0" height="66.0"/>
-          <line class="dim" x1="34.0" y1="304.0" x2="298.0" y2="304.0"/>
-          <line class="pw" style="--i:0;--len:264.0" x1="34.0" y1="112.0" x2="298.0" y2="112.0"/>
-          <line class="pw" style="--i:1;--len:176.0" x1="298.0" y1="112.0" x2="298.0" y2="288.0"/>
-          <line class="pw" style="--i:2;--len:115.5" x1="34.0" y1="288.0" x2="149.5" y2="288.0"/>
-          <line class="pw" style="--i:3;--len:115.5" x1="182.5" y1="288.0" x2="298.0" y2="288.0"/>
-          <line class="pw" style="--i:4;--len:176.0" x1="34.0" y1="112.0" x2="34.0" y2="288.0"/>
-          <line class="pw" style="--i:5;--len:44.0" x1="144.0" y1="112.0" x2="144.0" y2="156.0"/>
-          <line class="pw" style="--i:6;--len:44.0" x1="144.0" y1="178.0" x2="144.0" y2="222.0"/>
-          <line class="pw" style="--i:7;--len:44.0" x1="34.0" y1="222.0" x2="78.0" y2="222.0"/>
-          <line class="pw" style="--i:8;--len:66.0" x1="111.0" y1="222.0" x2="177.0" y2="222.0"/>
-          <line class="pw" style="--i:9;--len:44.0" x1="210.0" y1="222.0" x2="254.0" y2="222.0"/>
-          <line class="pw" style="--i:10;--len:16.5" x1="281.5" y1="222.0" x2="298.0" y2="222.0"/>
-          <line class="pw" style="--i:11;--len:38.5" x1="210.0" y1="249.5" x2="210.0" y2="288.0"/>
-        </g>
+        <div class="panel-head"><span>MANUAL PARAMETERS</span><span class="hint" id="param-source"></span></div>
+        <div id="params"></div>
+      </section>
 
-        <!-- the transform itself -->
-        <g class="arrow">
-          <line x1="318" y1="200" x2="356" y2="200"/>
-          <polygon points="354,192 372,200 354,208"/>
-        </g>
-
-        <!-- right: the derived model. Walls rise, far to near. -->
-        <g class="model">
-          <polygon class="fl" style="--i:0" points="560.0,91.0 672.6,156.0 560.0,221.0 447.4,156.0"/>
-          <polygon class="fl" style="--i:1" points="672.6,156.0 830.2,247.0 717.6,312.0 560.0,221.0"/>
-          <polygon class="fl" style="--i:2" points="447.4,156.0 560.0,221.0 492.5,260.0 379.9,195.0"/>
-          <polygon class="fl" style="--i:3" points="560.0,221.0 627.5,260.0 560.0,299.0 492.5,260.0"/>
-          <polygon class="fl" style="--i:4" points="627.5,260.0 717.6,312.0 650.1,351.0 560.0,299.0"/>
-          <polygon class="w wy" style="--i:0" points="560.0,91.0 379.9,195.0 379.9,153.4 560.0,49.4"/>
-          <polygon class="w wx" style="--i:1" points="560.0,91.0 830.2,247.0 830.2,205.4 560.0,49.4"/>
-          <polygon class="w wy" style="--i:2" points="672.6,156.0 627.5,182.0 627.5,140.4 672.6,114.4"/>
-          <polygon class="w wx" style="--i:3" points="447.4,156.0 492.5,182.0 492.5,140.4 447.4,114.4"/>
-          <polygon class="w wy" style="--i:4" points="605.0,195.0 560.0,221.0 560.0,179.4 605.0,153.4"/>
-          <polygon class="w wx" style="--i:5" points="526.2,201.5 593.8,240.5 593.8,198.9 526.2,159.9"/>
-          <polygon class="w wx" style="--i:6" points="379.9,195.0 498.1,263.2 498.1,221.7 379.9,153.4"/>
-          <polygon class="w wx" style="--i:7" points="627.5,260.0 672.6,286.0 672.6,244.4 627.5,218.4"/>
-          <polygon class="w wy" style="--i:8" points="599.4,276.2 560.0,299.0 560.0,257.4 599.4,234.7"/>
-          <polygon class="w wy" style="--i:9" points="830.2,247.0 650.1,351.0 650.1,309.4 830.2,205.4"/>
-          <polygon class="w wx" style="--i:10" points="700.7,302.2 717.6,312.0 717.6,270.4 700.7,260.6"/>
-          <polygon class="w wx" style="--i:11" points="531.9,282.8 650.1,351.0 650.1,309.4 531.9,241.2"/>
-          <line class="cap" style="--i:0" x1="560.0" y1="49.4" x2="379.9" y2="153.4"/>
-          <line class="cap" style="--i:1" x1="560.0" y1="49.4" x2="830.2" y2="205.4"/>
-          <line class="cap" style="--i:2" x1="672.6" y1="114.4" x2="627.5" y2="140.4"/>
-          <line class="cap" style="--i:3" x1="447.4" y1="114.4" x2="492.5" y2="140.4"/>
-          <line class="cap" style="--i:4" x1="605.0" y1="153.4" x2="560.0" y2="179.4"/>
-          <line class="cap" style="--i:5" x1="526.2" y1="159.9" x2="593.8" y2="198.9"/>
-          <line class="cap" style="--i:6" x1="379.9" y1="153.4" x2="498.1" y2="221.7"/>
-          <line class="cap" style="--i:7" x1="627.5" y1="218.4" x2="672.6" y2="244.4"/>
-          <line class="cap" style="--i:8" x1="599.4" y1="234.7" x2="560.0" y2="257.4"/>
-          <line class="cap" style="--i:9" x1="830.2" y1="205.4" x2="650.1" y2="309.4"/>
-          <line class="cap" style="--i:10" x1="700.7" y1="260.6" x2="717.6" y2="270.4"/>
-          <line class="cap" style="--i:11" x1="531.9" y1="241.2" x2="650.1" y2="309.4"/>
-        </g>
-
-        <!-- the sweep line, the same idea the app itself boots with -->
-        <line class="scan" x1="378" y1="30" x2="760" y2="250"/>
-      </svg>
-          <div class="art-labels">
-            <span class="al l">site.json · document units</span>
-            <span class="al r">occupancy grid → room graph → mesh</span>
-          </div>
+      <section id="centre">
+        <div id="view3d"></div>
+        <div id="unscaled-banner">UNSCALED MODEL — NOT FOR TACTICAL USE</div>
+        <div id="no-route-banner">NO ROUTE — SELECTED SPACES ARE DISCONNECTED</div>
+        <div id="walk-caption"></div>
+        <div id="hud">
+          <div id="hud-room">—</div>
+          <div id="hud-help">Click <b>Walkthrough</b>, then WASD to move, mouse to look, Shift to run, Esc to release the pointer.</div>
+        </div>
+        <div id="briefing">
+          <div class="b-step" id="b-step">1 / 5</div>
+          <div class="b-title" id="b-title"></div>
+          <div class="b-body" id="b-body"></div>
+          <div class="b-nav">← → to step · Esc to leave</div>
         </div>
       </section>
 
-      <section class="stats">
-        <div><b>5</b><span>independent scale sanity checks</span></div>
-        <div><b>O(V+E)</b><span>bridges, articulation points, betweenness</span></div>
-        <div><b>0</b><span>outbound sockets, enforced at runtime</span></div>
-        <div><b>1</b><span>occupancy grid, four consumers</span></div>
-      </section>
+      <section id="right">
+        <div class="panel-head"><span>TACTICAL LAYER</span></div>
+        <div class="row">
+          <label>From</label>
+          <select id="sel-from"></select>
+        </div>
+        <div class="row">
+          <label>To</label>
+          <select id="sel-to"></select>
+        </div>
+        <div class="row">
+          <label>Pace</label>
+          <select id="sel-pace" title="Movement profile: planning estimates, not doctrine"></select>
+        </div>
+        <div class="row">
+          <button id="btn-route" class="wide">Compute route</button>
+        </div>
+        <div id="route-out"></div>
+        <div class="row" id="route-actions">
+          <button id="btn-walk-route" disabled>Animated walkthrough</button>
+          <button id="btn-save-route">Save to briefing</button>
+        </div>
 
-      <section class="pillars">
-        <article>
-          <h3>The floor graph is the product</h3>
-          <p>
-            Rooms are nodes, doors and stairs are edges. A <b>bridge</b> door is the only
-            way between two halves of a building; an <b>articulation point</b> room
-            disconnects the graph if you lose it. Those are different questions, so they
-            are drawn in different colours on purpose.
-          </p>
-        </article>
-        <article>
-          <h3>Scale is falsifiable</h3>
-          <p>
-            Door width, wall thickness, corridor width, bounding box and smallest room
-            area are each checked against configurable plausibility bounds. If scale is
-            unknown the state is <b>UNSCALED</b> — areas are refused rather than
-            defaulted, and export and briefing are blocked. A confidently wrong building
-            is the worst thing this system could produce.
-          </p>
-        </article>
-        <article>
-          <h3>Sealed by construction</h3>
-          <p>
-            A runtime kill switch blocks every non-loopback socket, and a build-time
-            linter refuses to compile a network call below the app layer. The geometry
-            runs in TypeScript in the browser: if a perception backend existed and died,
-            the building would still render.
-          </p>
-        </article>
-      </section>
+        <div class="panel-head"><span>CRITICAL DOORS <em>(bridges)</em></span></div>
+        <div id="bridges"></div>
 
-      <section class="quote">
-        <blockquote>
-          The CV model is not the product. The <em>verified floor graph</em> is the
-          product. Every element carries who created it and whether a human has verified
-          it — and a model that has not been verified cannot reach a commander, because
-          briefing mode is gated on the document status, not on the interface.
-        </blockquote>
-        <a class="cta" href="./app.html">
-          Open the workstation
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
-        </a>
+        <div class="panel-head"><span>CRITICAL ROOMS <em>(articulation points)</em></span></div>
+        <div id="critical"></div>
+
+        <div class="panel-head"><span>SELECTION</span></div>
+        <div id="selection">Nothing selected. Click a room or a door, in either view.</div>
+        <div class="row" id="sel-actions"></div>
+
+        <div class="panel-head">
+          <span>AUDIT LOG <em>(ops.jsonl)</em></span>
+          <span class="hint" id="chain-state"></span>
+        </div>
+        <div class="row">
+          <button id="btn-undo">Undo</button>
+          <button id="btn-export-ops">Export log</button>
+        </div>
+        <div id="ops"></div>
+
+        <div class="panel-head"><span>MEASURED SUPERVISION</span><span class="hint" title="Corrective ops only. Accepts and status changes are excluded, so the number cannot fall simply because the operator clicked accept more often. Times are clamped at 30 s per op.">what counts ⓘ</span></div>
+        <div id="metrics"></div>
+
+        <div class="panel-head"><span>VIEW</span></div>
+        <div id="toggles"></div>
+
+        <div class="panel-head"><span>OFFLINE POSTURE</span></div>
+        <div id="netlog"></div>
       </section>
     </main>
 
-    <footer>
-      <span>NotMayasabha · SIH1773 · &ldquo;Conversion of 2D Blueprints into 3D Model&rdquo;</span>
-      <span>Runs air-gapped. Nothing on this page is fetched.</span>
-    </footer>
+    <script type="module" src="./src/main.ts"></script>
   </body>
 </html>

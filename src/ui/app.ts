@@ -24,7 +24,6 @@ import { Briefing } from './briefing';
 import { installScalePanel } from './scalePanel';
 import { installRouting } from './routing';
 import { installBriefingExport } from './briefingExport';
-import { installBootSequence } from './bootSequence';
 import {
   renderScale, renderFindings, renderGateHint, renderOps, renderMetrics,
   renderSelection, renderParams,
@@ -355,7 +354,7 @@ export function start(): void {
 
   plan.onSelect = (s) => select(s, true);
   viewer.renderer.domElement.addEventListener('click', (e) => {
-    if (viewer.mode === 'WALK' || assembly.playing) return;
+    if (viewer.mode === 'WALK') return;
     const ud = viewer.pick(e.clientX, e.clientY);
     if (!ud) return;
     if (ud.kind === 'room') select({ kind: 'room', storeyId: String(ud.storey), id: String(ud.room) });
@@ -445,9 +444,6 @@ export function start(): void {
   // ------------------------------------------------------------------ briefing + export
   installBriefingExport(S, brief, viewer, A, routing, refresh);
 
-  // ------------------------------------------------------------------ assembly
-  const assembly = installBootSequence(viewer, meshes, hood, S.doc, refresh);
-
   // ------------------------------------------------------------------ boot
   rebuildAnalysis();
   routing.fillPickers();
@@ -458,6 +454,4 @@ export function start(): void {
   S.on(() => { routing.fillPickers(); renderAnalysers(); if (selection) {
     $('selection').innerHTML = renderSelection(S, gr, br, ap, bc, selection.kind, selection.storeyId, selection.id);
   } });
-
-  assembly.start();
 }
