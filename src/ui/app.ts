@@ -62,7 +62,18 @@ function installPlanPicker(current: PlanId): void {
   });
 }
 
+/**
+ * The small-viewport notice dismisses to a body class, not to storage: CLAUDE.md §6
+ * forbids localStorage, and a warning that has to be re-read on the next visit is the
+ * correct behaviour for a warning about the device you are holding.
+ */
+function installViewportNotice(): void {
+  const btn = document.getElementById('ts-dismiss');
+  if (btn) btn.onclick = () => document.body.classList.add('ts-ok');
+}
+
 export function start(): void {
+  installViewportNotice();
   const t0 = performance.now();
   const planId = planFromUrl();
   const S = new Session(loadDoc(planId));
@@ -80,7 +91,7 @@ export function start(): void {
 
   const overlays = new Overlays(viewer.overlay, S.doc, meshes);
   const plan = new Plan2D($<HTMLCanvasElement>('plan'), S, gr);
-  const brief = new Briefing(viewer, S.doc, S.derived.mpu, {
+  const brief = new Briefing(viewer, S.doc, S.derived.grids, S.derived.mpu, {
     wrap: $('briefing'), step: $('b-step'), title: $('b-title'), body: $('b-body'),
   });
 

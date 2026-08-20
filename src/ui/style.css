@@ -681,3 +681,133 @@ button.tiny { padding: 4px 8px; font-size: 10.5px; font-weight: 500; }
 @media (prefers-reduced-motion: reduce) {
   * { transition-duration: 1ms !important; }
 }
+
+/* ───────────────────  walkthrough caption + turn-by-turn  ─────────────────── */
+
+/*
+ * The live instruction during an animated walkthrough. Bottom-centre, over the 3D
+ * view, out of the way of the HUD room readout at the top.
+ */
+#walk-caption {
+  position: absolute;
+  left: 50%;
+  bottom: 26px;
+  transform: translateX(-50%) translateY(6px);
+  z-index: 6;
+  display: none;
+  max-width: 78%;
+  padding: 9px 20px;
+  border-radius: 999px;
+  font: 600 14px/1.2 var(--sans);
+  letter-spacing: 0.02em;
+  color: #eef3fa;
+  background: rgba(9, 13, 20, 0.88);
+  border: 1px solid rgba(0, 229, 255, 0.55);
+  box-shadow: 0 6px 24px -8px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+#walk-caption.on { display: block; opacity: 1; transform: translateX(-50%) translateY(0); }
+
+.turn-list {
+  padding: 4px 0 6px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 4px;
+}
+.turn-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 3px 14px;
+  font-size: 12px;
+  color: var(--text);
+}
+.turn-line .arrow {
+  flex: 0 0 auto;
+  width: 14px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--faint);
+}
+/* Only the turns that change direction are coloured; ahead and arrive stay quiet. */
+.turn-line.turn-left .arrow,
+.turn-line.turn-hard_left .arrow { color: #f1c40f; }
+.turn-line.turn-right .arrow,
+.turn-line.turn-hard_right .arrow { color: #2ecc71; }
+.turn-line.turn-up .arrow,
+.turn-line.turn-down .arrow { color: #b58cff; }
+.turn-line.turn-arrive { font-weight: 600; }
+.turn-line.turn-arrive .arrow { color: var(--accent); }
+
+/*
+ * The movement profile's assumptions, printed under the route header. These are planning
+ * estimates, and the panel says so in the operator's own view rather than only in a docstring.
+ */
+.pace-note {
+  padding: 6px 14px 8px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--text-2);
+  border-bottom: 1px solid var(--line);
+}
+.pace-note .k {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--faint);
+}
+
+/* ─────────────────────────  small-viewport notice  ───────────────────────── */
+
+/*
+ * Hidden by default and revealed only by the media query below, so a desktop user
+ * never pays for it. `body.ts-ok` is set by the dismiss button and wins over the
+ * query — nothing is ever hard-blocked, it is a warning, not a gate.
+ */
+#too-small { display: none; }
+
+@media (max-width: 1100px), (pointer: coarse) and (max-width: 1400px) {
+  #too-small {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: var(--bg);
+  }
+  body.ts-ok #too-small { display: none; }
+}
+
+.ts-card {
+  max-width: 460px;
+  text-align: center;
+  background: var(--panel);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-panel);
+  padding: 34px 30px 28px;
+  box-shadow: 0 20px 60px -24px rgba(17, 34, 64, 0.35);
+}
+.ts-mark {
+  font-size: 26px;
+  color: var(--accent);
+  margin-bottom: 12px;
+}
+.ts-card h1 {
+  font: 600 19px/1.25 var(--sans);
+  color: var(--text);
+  margin: 0 0 12px;
+}
+.ts-card p {
+  font: 400 13.5px/1.6 var(--sans);
+  color: var(--text-2);
+  margin: 0 0 12px;
+}
+.ts-card .ts-hint {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--faint);
+  margin-bottom: 20px;
+}

@@ -10,6 +10,7 @@ import {
   isolationOf, deadEnds, OUTSIDE,
 } from '../src/analysis/graph';
 import { blockedAt } from '../src/core/grid';
+import { walkPath } from '../src/analysis/path';
 
 const t0 = Date.now();
 const s = new Session(loadDoc('mahindra'));
@@ -113,17 +114,45 @@ console.log(`\n  determinism: ${d2.hash} == ${derive(loadDoc('mahindra')).hash}`
 console.log('\n-- every bundled plan (structural) --');
 let planFail = false;
 for (const p of PLANS) {
-  const d = derive(loadDoc(p.id));
-  const g = buildRoomGraph(loadDoc(p.id), d.grids);
+  const doc = loadDoc(p.id);
+  const d = derive(doc);
+  const g = buildRoomGraph(doc, d.grids);
   const rooms = [...g.nodes.values()].filter((n) => n.key !== OUTSIDE);
   const unreachable = rooms.filter((n) => !route(g, OUTSIDE, n.key));
-  const gt = statusGate(loadDoc(p.id), d.findings, new Set());
+  const gt = statusGate(doc, d.findings, new Set());
   const stable = d.hash === derive(loadDoc(p.id)).hash;
-  const ok = rooms.length > 0 && unreachable.length === 0 && gt.blocking.length === 0 && stable;
+
+  // Every walkthrough path, sampled against the collision mask. This is the assertion
+  // the animated preview never had: the old centroid-to-door polyline was spline-
+  // smoothed into the walls it was supposed to thread, on 11 of 18 routes.
+  let pierced = 0, worstRoom = '';
+  for (const n of rooms) {
+    const r = route(g, OUTSIDE, n.key);
+    if (!r) continue;
+    const wp = walkPath(g, r, doc, d.grids, d.mpu);
+    for (let i = 1; i < wp.points.length; i++) {
+      const a = wp.points[i - 1], b = wp.points[i];
+      if (a.storey_id !== b.storey_id) continue;
+      const gg = d.grids.get(a.storey_id);
+      if (!gg) continue;
+      const steps = Math.max(2, Math.ceil(Math.hypot(b.x_u - a.x_u, b.y_u - a.y_u) / gg.cell));
+      for (let t = 0; t <= steps; t++) {
+        const x = a.x_u + (b.x_u - a.x_u) * (t / steps), y = a.y_u + (b.y_u - a.y_u) * (t / steps);
+        const ci = Math.floor((x - gg.x0) / gg.cell), cj = Math.floor((y - gg.y0) / gg.cell);
+        if (ci < 0 || ci >= gg.nx || cj < 0 || cj >= gg.ny) continue;
+        if (blockedAt(gg, x, y)) { pierced++; if (!worstRoom) worstRoom = n.name; }
+      }
+    }
+  }
+
+  const ok = rooms.length > 0 && unreachable.length === 0 && gt.blocking.length === 0
+    && stable && pierced === 0;
   if (!ok) planFail = true;
   console.log(
     `  ${ok ? 'OK  ' : 'FAIL'} ${p.id.padEnd(15)} storeys=${d.grids.size} rooms=${String(rooms.length).padStart(2)}` +
-    `  unreachable=${unreachable.length}  blocking=${gt.blocking.length}  hash=${d.hash}${stable ? '' : ' UNSTABLE'}` +
+    `  unreachable=${unreachable.length}  blocking=${gt.blocking.length}  wall-pierce=${pierced}` +
+    `  hash=${d.hash}${stable ? '' : ' UNSTABLE'}` +
+    `${pierced ? '  [first: ' + worstRoom + ']' : ''}` +
     `${unreachable.length ? '  [' + unreachable.map((n) => n.name).join(', ') + ']' : ''}`,
   );
 }

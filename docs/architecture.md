@@ -585,17 +585,21 @@ scale, so it cannot violate I5/I6 even by accident. The conversion to world poin
 metres happens once, at the ui layer, in a pure function:
 
 ```ts
-routePath(gr: RoomGraph, route: Route | null, site: SiteDocument, mpu: number)
-  -> { points: THREE.Vector3[]; length_m: number }
+routePath(gr, route, site, grids, mpu)
+  -> { points: THREE.Vector3[]; length_m: number; steps: Step[]; cumulative_m: number[]; plan: PathPoint[] }
 ```
+
+Since §5.2 the *geometry* is no longer computed here: `routePath` is a presentation
+wrapper over `analysis/path.ts`, and this file now owns only the camera lead-in, the
+metre conversion and the playback clocks.
 
 This replaces the private `routePts()` that used to live only inside `ui/briefing.ts`.
 Briefing Mode stage 3 and the Tactical Layer's walkthrough button now both call this one
 function, so the two cameras cannot silently diverge into two slightly different lines
-through the building. `routePath.ts` also exports `WALK_PACE_MPS` (1.35 m/s — a
-room-clearing team's pace, not a sprint and not a stroll, named so the assumption is
-greppable), `etaSeconds`, `formatEta`, `formatPace`, `walkFlightMs` and
-`BRIEFING_FLIGHT_MS`.
+through the building. `routePath.ts` also exports `etaSeconds`, `formatEta`,
+`formatPace`, `walkFlightMs` and `BRIEFING_FLIGHT_MS`. The single `WALK_PACE_MPS = 1.35`
+constant it used to own was replaced in §5.3 — one pedestrian speed could not describe
+both a deliberate clear and a dynamic entry.
 
 **`length_m` excludes the camera lead-in, and the ordering in the code is the reason.**
 An exterior route prepends a point `CAMERA_LEAD_IN_M` (7 m) outside the front door, so the
@@ -622,8 +626,10 @@ compressed flight imply real time.
 
 **The "Animated walkthrough" button.** Second row of the Tactical Layer panel, beside
 `Save to briefing`, under `route-out`, so the sequence reads: compute → read the numbers →
-preview or persist. It calls `viewer.followPath(points, 3, walkFlightMs(length_m), true)` —
-walkthrough height rather than Briefing's 7.5 m doll-house height, and `lock = true`.
+preview or persist. It calls `viewer.followPath(points, 0, walkFlightMs(length_m), true, 1.2)` — riding the
+path at eye height with a 1.2 m leash, and `lock = true`. The heights it used to pass
+(3 m here, 7.5 m in Briefing) were **added on top of a path already at eye height**; see
+§5.2 for why that was wrong.
 
 **Playback is atomic: it runs to the end.** A timed measurement cut halfway is not a
 shorter measurement, it is a wrong one, so there is no stop control and no `Escape`
@@ -647,8 +653,9 @@ the route polyline, not the collision-checked first-person body the top-bar `Wal
 button drives via `enterWalk`/`blocked()`. Both features keep the word "walkthrough" in the
 UI on purpose — a commander does not care which camera is under the hood — but every team
 member must be able to say which is which if a judge asks (§6, STANDARDS): one is a body
-that cannot pass through a wall, the other is a camera that has not been asked to prove it
-can't.
+that resolves collisions per frame, the other is a camera flying a path that was **proved
+collision-free before playback started** (§5.2). Neither can cross a wall; they establish
+it at different times, and that distinction is the honest answer to give.
 
 **The viewer fix this exposed.** `flyTo` set `this.fly` but never cleared `this.path`, so
 a `followPath` cinematic already in flight would silently keep running underneath a later
@@ -705,6 +712,123 @@ Both demo routes play at true walking pace. Note the consequence of the atomic-p
 rule: the longer of them holds the camera for a full 20 s with no way out. That is correct
 for a measurement and a real cost on stage — trigger it deliberately, not while a judge is
 mid-question.
+
+---
+
+### 5.2 The walkable path engine — **BUILT**
+
+§5.1 shipped a tracking shot over a polyline of room centroids and door points. §12 listed
+the rigorous version as deferred and named the risk exactly: *"the only one that cannot clip
+a wall on stage."* It clipped walls on stage. This section is that deferral, closed.
+
+**What was wrong, measured.** Sampling the curve the camera actually flew against
+`walkMask`, on the Mahindra plan:
+
+| Route | Samples inside a wall (of 401) |
+|---|---|
+| Rotunda | 41 |
+| Toilet | 39 |
+| ECR 3 | 34 |
+| Faculty 1–6 | 0 |
+
+Three independent causes, not one:
+
+1. **The camera was a drone.** Path points sat at `base + EYE_M`, then `tick()` added
+   `path.height` **on top** — 3 m for the preview, 7.5 m for Briefing. Walls are 3.2 m, so
+   the "walkthrough" flew *above the wall tops* on a one-storey plan and *inside the
+   storey above* on a two-storey one. It also trailed 6.5 m behind, through 1.0 m doors.
+2. **Catmull-Rom overshoot.** The uniform parameterisation bulges outside its control
+   points at a corner, and the corner was made of wall. Faculty 1–6 scored 0 only because
+   they route through a wide gallery with no tight corner to overshoot.
+3. **Stairs were one point.** A `STAIR` edge carries a single `point_u` at the footprint
+   centroid on the **lower** storey, so the path lerped diagonally through the floor slab
+   instead of climbing. `up_direction_u`, `riser_m` and `step_count` were all present and
+   all ignored.
+
+**`analysis/gridsearch.ts` (L2) — geometry over one storey's grid.** A clearance field
+(multi-source BFS from every blocked cell, capped, cached per `Grid` in a `WeakMap`, so a
+rebuilt grid is a new key and the cache cannot go stale), A* over `walkMask` biased away
+from walls by that field, and a line-of-sight string-pull. It knows nothing about rooms,
+routes or storeys.
+
+**`analysis/path.ts` (L2) — route to polyline.** Expands a `Route` into anchors: room
+centres, three collinear points on each door normal (standoff → threshold → standoff, so
+the walker meets a 1.0 m opening square instead of clipping a jamb), and real stair
+flights. Each same-storey leg is A*-searched and simplified. A leg that cannot be searched
+falls back to a straight line rather than dropping the route — a visibly wrong segment is
+recoverable, a silently missing one is not.
+
+**`analysis/directions.ts` (L2) — turn-by-turn.** Signed heading change at each simplified
+vertex, bucketed into left/right/sharp/ahead, with `UP`/`DOWN` taken from floor elevation
+change. This is only meaningful *after* the path is walkable: you cannot honestly say
+"turn right" about a line that crosses a wall. Rendered in the route panel and as a live
+caption during playback, keyed off `Viewer.onPathProgress`.
+
+**Why L2 and not L4.** The old `routePath.ts` sat in `ui/` doing geometry, which is why it
+never reached the occupancy grid two layers below it. Path geometry belongs beside the room
+graph. `ui/routePath.ts` survives as a thin presentation wrapper — lead-in, metres, clocks.
+
+**The camera.** Rides the path at eye height (`height = 0`), with an optional leash clamped
+to the distance already travelled. Look-ahead is a fixed **2.6 m**, not `k + 0.06` of total
+arc length — the old form made turn anticipation depend on how long the route happened to
+be. Yaw is damped at 2.2 rad/s along the shortest angular path. Both curves — camera and
+route ribbon — use `centripetal` Catmull-Rom, which is provably cusp- and loop-free.
+
+**One line, everywhere.** The 3D ribbon, the 2D dashed plan line, the flown camera and the
+route saved to the briefing all consume the same searched path. Before this they were four
+slightly different lines through the building.
+
+**The regression test that should have existed.** `test-contracts` now samples every route
+on every bundled plan against `walkMask` and fails on a single blocked sample
+(`wall-pierce=0`). Verified to fail: bypassing the grid search reports `wall-pierce=198`
+and `SMOKE FAILED`.
+
+---
+
+### 5.3 Movement profiles — **BUILT**
+
+Route time was `length_m / 1.35` — one pedestrian walking speed, applied to an assaulting
+team. It was wrong in two separate ways, and the second is the interesting one.
+
+**Wrong speed.** 1.35 m/s is an unloaded civilian stroll. An operator in armour, helmet and
+breaching kit moves slower than that when clearing and far faster than it on a known route.
+One number could not be both.
+
+**Wrong shape.** Time indoors is not proportional to distance. Doorways and corners cost
+time whatever the distance between them, and on a real plan **that is often most of the
+clock** — 30–45% on the training block's routes, and 45% on the 12 m route to Office A.
+Five doorways in twelve metres is not a nine-second problem, and the distance-only model
+said it was.
+
+**`analysis/pace.ts` (L2).** Three profiles, each a loaded operator (~20 kg):
+
+| Profile | Level | Stair | Door | Turn | Represents |
+|---|---|---|---|---|---|
+| Deliberate clear | 0.65 m/s | 0.35 m/s | 4.0 s | 1.5 s | Weapon up, every space unknown |
+| **Tactical advance** (default) | 1.20 m/s | 0.60 m/s | 2.0 s | 0.6 s | Controlled advance, partially cleared |
+| Dynamic entry | 3.20 m/s | 1.20 m/s | 0.8 s | 0.2 s | Speed and surprise on a briefed route |
+
+`traverseSeconds = level_m/level_mps + climb_m/stair_mps + doors×door_s + turns×turn_s`.
+
+Stair distance is measured **along the slope**, which §5.2's stair-stitching made possible:
+before it, a storey change was a single point and had no length to pace. On the training
+block every upper-floor route reports 5.5 m of climb for a 3.2 m rise — a 35.6° stair,
+which is the geometry actually in the fixture.
+
+Turn counts come from §5.2's `directions.ts`, and only real direction changes count:
+`AHEAD`, `START`, `ARRIVE`, `UP` and `DOWN` are excluded. A corner has to be cleared before
+it is turned, so a turn is a cost, not just a label.
+
+**These are configurable planning estimates, not doctrine.** They carry exactly the
+standing of the plausibility bands in `core/scale.ts` (§5), the module docstring says so,
+and the panel repeats it to the operator rather than hiding it in a comment: the selected
+profile prints its own assumptions and the share of the ETA that is doors and corners.
+**Say this out loud if a judge asks.** The defensible claim is that the model is explicit
+and tunable, not that the constants are measured truth — a system asserting it knows an
+NSG team's exact clearance rate is a system that has not asked one.
+
+Changing the profile recomputes the route rather than relabelling it: the ETA, the preview
+duration, and the `formatPace()` compression notice all derive from it.
 
 ---
 
@@ -923,7 +1047,7 @@ Three more to say before a judge finds them:
 | Unity or Unreal | Long install, export risk, crash risk on a judge's laptop |
 | A general vector-PDF parser | Handle DXF and SVG properly. Treat PDF as raster |
 | Roof topology | Flat ceilings at wall height. Assault teams breach walls and doors, not roof pitch |
-| Grid-planned, collision-verified walkthrough POV (§5.1) | The A*/funnel/stair-stitch version is the only one that cannot clip a wall on stage, but it is a half-day item. The cheap tracking-shot version (§5.1) ships instead; the rigorous one is not a cut corner so much as a next build |
+| ~~Grid-planned, collision-verified walkthrough POV (§5.1)~~ | **No longer deferred — built, see §5.2.** The tracking-shot version did clip walls on stage, on 11 of 18 routes. The A*/string-pull/stair-stitch version replaced it, and `test-contracts` now fails on a single blocked sample |
 
 Governing rule: if a feature does not raise verified-model fidelity, lower correction
 density, or appear in the five-minute demo, it does not exist this week.

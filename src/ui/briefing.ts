@@ -11,7 +11,9 @@ import * as THREE from 'three';
 import type { Viewer } from '../view3d/viewer';
 import type { RoomGraph, Route } from '../analysis/graph';
 import type { SiteDocument } from '../core/types';
+import type { Grid } from '../core/grid';
 import { routePath, etaSeconds, formatEta, BRIEFING_FLIGHT_MS } from './routePath';
+import { DEFAULT_PROFILE, profile } from '../analysis/pace';
 
 export interface BriefStep {
   title: string;
@@ -29,6 +31,7 @@ export class Briefing {
   constructor(
     private viewer: Viewer,
     private site: SiteDocument,
+    public grids: Map<string, Grid>,
     public mpu: number,
     private el: {
       wrap: HTMLElement; step: HTMLElement; title: HTMLElement; body: HTMLElement;
@@ -43,7 +46,7 @@ export class Briefing {
     const exit = gr.edges.find((e) => e.is_exit);
     const base = (id: string): number => this.site.storeys.find((s) => s.id === id)?.elevation_m ?? 0;
 
-    const rp = routePath(gr, route, this.site, this.mpu);
+    const rp = routePath(gr, route, this.site, this.grids, this.mpu);
     const nDoors = route ? route.doors : 0;
     const adj = target ? gr.adj.get(target.key)!.map((a) => gr.nodes.get(a.to)!.name) : [];
 
@@ -79,7 +82,8 @@ export class Briefing {
           ? 'No target selected.'
           : route
             ? `Entry to ${target.name}: ${nDoors} doors, ${rp.length_m.toFixed(0)} m, about ` +
-              `${formatEta(etaSeconds(rp.length_m))} at walking pace. The route is the shortest ` +
+              `${formatEta(etaSeconds(rp.traverse, DEFAULT_PROFILE))} at ` +
+              `${profile(DEFAULT_PROFILE).label.toLowerCase()} pace. The route is the shortest ` +
               'path over the room graph, where rooms are nodes and doorways are edges.'
             : `NO ROUTE to ${target.name}. The room graph is disconnected between the entry and ` +
               'this space — no door or stair links them. Do not brief this path; verify the plan first.',
@@ -89,7 +93,10 @@ export class Briefing {
           V.setRoofVisible(false);
           // Fixed and brisk: this is one beat in a rehearsed five-step sequence, and the
           // honest distance and time are in the body text above, not in the camera's clock.
-          if (rp.points.length >= 2) V.followPath(rp.points, 7.5, BRIEFING_FLIGHT_MS);
+          // Briefing keeps a raised, trailing camera on purpose — it is an establishing shot
+          // for a room of people, not a walkthrough — but 1.4 m above the path, not 7.5 m
+          // above the wall tops, and the trail is a leash the curve itself supplies.
+          if (rp.points.length >= 2) V.followPath(rp.points, 1.4, BRIEFING_FLIGHT_MS, false, 5.0);
           else V.flyTo(new THREE.Vector3(10, 26, -18), centre, 1400);
         },
       },

@@ -30,6 +30,9 @@ export class Plan2D {
   private zoomFactor = 1; private panX = 0; private panY = 0;
   storeyId: string;
   route: Route | null = null;
+  /** The walkable path for `route`, in document units. Drawn in preference to the
+   *  straight centroid line, which crossed walls the flown path does not. */
+  routeWalk: Array<{ x_u: number; y_u: number; storey_id: string }> | null = null;
   bridgeKeys = new Set<string>();
   criticalRooms = new Set<string>();
   selection: PlanSelection | null = null;
@@ -231,12 +234,16 @@ export class Plan2D {
 
     // Route.
     if (this.route) {
-      const pts: Array<[number, number]> = [];
-      for (let i = 0; i < this.route.nodes.length; i++) {
-        const n = this.gr.nodes.get(this.route.nodes[i]);
-        if (n && n.room_id && n.storey_id === st.id) pts.push(n.centre_u);
-        const e = this.route.edges[i];
-        if (e && e.storey_id === st.id) pts.push(e.point_u);
+      let pts: Array<[number, number]> = [];
+      if (this.routeWalk && this.routeWalk.length >= 2) {
+        pts = this.routeWalk.filter((p) => p.storey_id === st.id).map((p) => [p.x_u, p.y_u]);
+      } else {
+        for (let i = 0; i < this.route.nodes.length; i++) {
+          const n = this.gr.nodes.get(this.route.nodes[i]);
+          if (n && n.room_id && n.storey_id === st.id) pts.push(n.centre_u);
+          const e = this.route.edges[i];
+          if (e && e.storey_id === st.id) pts.push(e.point_u);
+        }
       }
       if (pts.length >= 2) {
         ctx.strokeStyle = hex(COL.route);

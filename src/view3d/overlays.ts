@@ -99,10 +99,20 @@ export class Overlays {
     this.routeGroup.clear();
   }
 
-  /** Draw the route as a floating ribbon with a marker at every door it passes. */
-  drawRoute(gr: RoomGraph, r: Route): void {
+  /**
+   * Draw the route as a floating ribbon with a marker at every door it passes.
+   * `walk` is the searched walkable path in document units; when it is supplied the
+   * ribbon follows it exactly, so the drawn route and the flown route are the same
+   * line. The centroid fallback below is only for callers that have no path yet.
+   */
+  drawRoute(gr: RoomGraph, r: Route, walk?: Array<{ x_u: number; y_u: number; floor_m: number }>): void {
     this.clearRoute();
     const pts: THREE.Vector3[] = [];
+    if (walk && walk.length >= 2) {
+      for (const p of walk) pts.push(new THREE.Vector3(p.x_u, p.floor_m + 0.25, p.y_u));
+      this.ribbon(pts, r);
+      return;
+    }
     const at = (key: string): THREE.Vector3 | null => {
       const n = gr.nodes.get(key);
       if (!n) return null;
@@ -131,11 +141,18 @@ export class Overlays {
       const d = new THREE.Vector3().subVectors(first, second).normalize().multiplyScalar(3.0);
       pts.unshift(new THREE.Vector3().addVectors(first, d));
     }
+    this.ribbon(pts, r);
+  }
+
+  /** The ribbon mesh and its door rings. Shared by both drawRoute paths. */
+  private ribbon(pts: THREE.Vector3[], r: Route): void {
     if (pts.length < 2) return;
 
-    const curve = new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.15);
+    // 'centripetal' for the same reason the camera uses it: the uniform variant
+    // overshoots corners, and a ribbon that bulges through a wall says the route does.
+    const curve = new THREE.CatmullRomCurve3(pts, false, 'centripetal', 0.5);
     const tube = new THREE.Mesh(
-      new THREE.TubeGeometry(curve, Math.max(24, pts.length * 12), 0.09, 8, false),
+      new THREE.TubeGeometry(curve, Math.max(24, pts.length * 4), 0.09, 8, false),
       new THREE.MeshStandardMaterial({ color: COL.route, emissive: 0x004455, roughness: 0.4 }),
     );
     tube.renderOrder = 5;

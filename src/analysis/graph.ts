@@ -9,7 +9,7 @@
  *          Both are shipped, and they are labelled differently on purpose.
  */
 
-import type { SiteDocument, RoomUse } from '../core/types';
+import type { SiteDocument, RoomUse, Storey } from '../core/types';
 import { roomAt, nodeMap, wallSeg, openingCentre, roomRects, type Grid } from '../core/grid';
 
 export const OUTSIDE = 'OUTSIDE';
@@ -47,6 +47,23 @@ export interface RoomGraph {
 
 export function nodeKey(storeyId: string, roomId: string): string {
   return `${storeyId}:${roomId}`;
+}
+
+/**
+ * Which room graph key — a room's `nodeKey`, or OUTSIDE — a plan-space point falls in,
+ * or null if it falls in neither (inside wall thickness, off the building envelope with
+ * no outside flood reaching it, or off-grid). Shared by the door-edge classification
+ * here and by `analysis/path.ts`, which uses the same test to tell a door's two
+ * standoff points apart: a point is not "the near one" by distance to whatever anchor
+ * happened to precede it, it is the one that actually lies on the room the walker is
+ * coming from.
+ */
+export function sideKey(st: Storey, g: Grid, x: number, y: number): string | null {
+  const idx = roomAt(g, x, y);
+  if (idx >= 0) return nodeKey(st.id, st.rooms[idx].id);
+  const i = Math.floor((x - g.x0) / g.cell), j = Math.floor((y - g.y0) / g.cell);
+  if (i >= 0 && i < g.nx && j >= 0 && j < g.ny && g.outsideMask[j * g.nx + i]) return OUTSIDE;
+  return null;
 }
 
 /** A point inside the room, close to the centroid of its cells. */
@@ -102,15 +119,8 @@ export function buildRoomGraph(site: SiteDocument, grids: Map<string, Grid>): Ro
       const nx = -(seg.by - seg.ay) / L, ny = (seg.bx - seg.ax) / L;
       const [cx, cy] = openingCentre(o, w, N);
       const probe = w.thickness_u / 2 + 0.35;
-      const sideKey = (sx: number, sy: number): string | null => {
-        const idx = roomAt(g, sx, sy);
-        if (idx >= 0) return nodeKey(st.id, st.rooms[idx].id);
-        const i = Math.floor((sx - g.x0) / g.cell), j = Math.floor((sy - g.y0) / g.cell);
-        if (i >= 0 && i < g.nx && j >= 0 && j < g.ny && g.outsideMask[j * g.nx + i]) return OUTSIDE;
-        return null;
-      };
-      const ka = sideKey(cx + nx * probe, cy + ny * probe);
-      const kb = sideKey(cx - nx * probe, cy - ny * probe);
+      const ka = sideKey(st, g, cx + nx * probe, cy + ny * probe);
+      const kb = sideKey(st, g, cx - nx * probe, cy - ny * probe);
       if (!ka || !kb || ka === kb) continue;
       edges.push({
         key: o.id, kind: 'DOOR', a: ka, b: kb, opening_id: o.id, storey_id: st.id,

@@ -16,8 +16,9 @@ import type { SiteDocument, Stair } from '../core/types';
 import { frameBox as fitFrame } from './framing';
 import { PostFX, markGlow } from './postfx';
 import { applyWallRim } from './rim';
+import { TrackingShot } from './tracking';
 
-const EYE_M = 1.6;
+export const EYE_M = 1.5;
 const BODY_R = 0.28;
 const WALK_MS = 3.1;
 const RUN_MS = 6.0;
@@ -27,6 +28,12 @@ const IDLE_S = 5;
 /** Below this, sustained, the expensive AO pass is dropped. Measured, not assumed. */
 const DEGRADE_FPS = 40;
 const DEGRADE_S = 2.5;
+
+/** Where a finished tracking shot leaves the camera: pulled back, lifted, looking at
+ *  the point it arrived at. Enough clearance to orbit without being inside the room. */
+const PATH_EXIT_BACK_M = 9;
+const PATH_EXIT_UP_M = 7;
+const PATH_EXIT_MS = 900;
 
 export type ViewMode = 'ORBIT' | 'WALK';
 
@@ -59,10 +66,12 @@ export class Viewer {
   private frames = 0;
   private fpsAcc = 0;
   private fly: { from: THREE.Vector3; to: THREE.Vector3; fromLook: THREE.Vector3; toLook: THREE.Vector3; t: number; dur: number } | null = null;
-  private path: { curve: THREE.CatmullRomCurve3; t: number; dur: number; height: number } | null = null;
+  private path: TrackingShot | null = null;
   /** Set by an uninterruptible `followPath`. Cleared only when that path runs out. */
   private locked = false;
   private lookTarget = new THREE.Vector3();
+  /** Fired each frame of a followPath with its progress, 0..1. */
+  onPathProgress: ((k: number) => void) | null = null;
   onRoomEnter: ((roomId: string | null) => void) | null = null;
   /** Fired when the walkthrough ends by any means other than clicking Doll-house. */
   onWalkExit: (() => void) | null = null;
@@ -455,15 +464,12 @@ export class Viewer {
    * commander can step on through the sequence. The Tactical Layer's animated walkthrough
    * plays a locked one: it is a timed measurement, and a measurement cut halfway is a lie.
    */
-  followPath(points: THREE.Vector3[], height: number, ms: number, lock = false): void {
+  followPath(points: THREE.Vector3[], height: number, ms: number, lock = false, leash = 0): void {
     if (this.locked || points.length < 2) return;
     this.stopCinematic();
     this.enterOrbit();
     this.touch();
-    this.path = {
-      curve: new THREE.CatmullRomCurve3(points, false, 'catmullrom', 0.2),
-      t: 0, dur: ms / 1000, height,
-    };
+    this.path = new TrackingShot(points, ms / 1000, height, leash, this._mpu);
     this.locked = lock;
   }
 
@@ -474,15 +480,17 @@ export class Viewer {
   private tick(): void {
     const dt = Math.min(0.05, this.clock.getDelta());
     if (this.path) {
-      this.path.t += dt;
-      const k = Math.min(1, this.path.t / this.path.dur);
-      const p = this.path.curve.getPointAt(k);
-      const ahead = this.path.curve.getPointAt(Math.min(1, k + 0.06));
-      const back = new THREE.Vector3().subVectors(p, ahead).setY(0).normalize().multiplyScalar(6.5);
-      this.camera.position.set(p.x + back.x, p.y + this.path.height, p.z + back.z);
-      this.orbit.target.copy(ahead);
-      this.camera.lookAt(ahead);
-      if (k >= 1) { this.path = null; this.locked = false; }
+      this.path.step(dt, this.camera, this.orbit.target);
+      if (this.onPathProgress) this.onPathProgress(this.path.k);
+      if (this.path.done) {
+        // Hand the camera back somewhere it can actually orbit from. Without this the
+        // shot ends with the camera standing inside the destination room and the orbit
+        // controls resume from there, which renders the inside of a wall.
+        const f = this.path.endFraming(PATH_EXIT_BACK_M, PATH_EXIT_UP_M);
+        this.path = null;
+        this.locked = false;
+        this.flyTo(f.pos, f.look, PATH_EXIT_MS);
+      }
     } else if (this.fly) {
       this.fly.t += dt;
       const k = Math.min(1, this.fly.t / this.fly.dur);

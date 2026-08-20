@@ -21,9 +21,24 @@ import type { Overlays } from '../view3d/overlays';
 import type { Viewer } from '../view3d/viewer';
 import { route as findRoute, OUTSIDE, type Route, type RoomGraph } from '../analysis/graph';
 import { routePath, etaSeconds, formatEta, formatPace, walkFlightMs, type RoutePath } from './routePath';
+import { PROFILES, DEFAULT_PROFILE, profile, fixedShare, type ProfileId } from '../analysis/pace';
+import type { Turn } from '../analysis/path';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string): T => document.getElementById(id) as T;
-const WALK_HEIGHT_M = 3;
+
+/** One glyph per instruction. Direction has to survive being read at a glance. */
+const ARROW: Record<Turn, string> = {
+  START: '\u25CF', AHEAD: '\u2191', LEFT: '\u2190', RIGHT: '\u2192',
+  HARD_LEFT: '\u21B0', HARD_RIGHT: '\u21B1', UP: '\u21D1', DOWN: '\u21D3',
+  ARRIVE: '\u25C9',
+};
+/**
+ * The preview rides the path itself. It used to add 3 m on top of a path already at
+ * eye height, which on a 3.2 m storey put the camera above the wall tops — a drone
+ * shot, not a walkthrough. A short leash keeps a sense of a body moving ahead.
+ */
+const WALK_RISE_M = 0;
+const WALK_LEASH_M = 1.2;
 
 export interface GraphRef {
   gr: RoomGraph;
@@ -46,7 +61,12 @@ export function installRouting(S: Session, plan: Plan2D, overlays: Overlays, ref
   const fromSel = $<HTMLSelectElement>('sel-from');
   const toSel = $<HTMLSelectElement>('sel-to');
   const walkBtn = $<HTMLButtonElement>('btn-walk-route');
-  let lastPath: RoutePath = { points: [], length_m: 0 };
+  const paceSel = $<HTMLSelectElement>('sel-pace');
+  let paceId: ProfileId = DEFAULT_PROFILE;
+  let lastPath: RoutePath = {
+    points: [], length_m: 0, steps: [], cumulative_m: [], plan: [],
+    traverse: { level_m: 0, climb_m: 0, doors: 0, turns: 0 },
+  };
   let playing = false;
   let pollId: number | null = null;
 
@@ -69,16 +89,37 @@ export function installRouting(S: Session, plan: Plan2D, overlays: Overlays, ref
       state.currentRoute = r;
       state.targetKey = toSel.value;
       plan.route = r;
+      plan.routeWalk = null;
       plan.targetKey = state.targetKey;
       overlays.markTarget(ref.gr, state.targetKey);
       $('no-route-banner').classList.toggle('on', !r);
-      lastPath = routePath(ref.gr, r, S.doc, S.derived.mpu);
+      lastPath = routePath(ref.gr, r, S.doc, S.derived.grids, S.derived.mpu);
       if (r) {
-        overlays.drawRoute(ref.gr, r);
+        plan.routeWalk = lastPath.plan;
+        overlays.drawRoute(ref.gr, r, lastPath.plan);
         const un = S.derived.unscaled;
-        const dist = un ? 'distance UNAVAILABLE (unscaled)' : `${lastPath.length_m.toFixed(0)} m · ~${formatEta(etaSeconds(lastPath.length_m))}`;
+        const eta = etaSeconds(lastPath.traverse, paceId);
+        const dist = un
+          ? 'distance UNAVAILABLE (unscaled)'
+          : `${lastPath.length_m.toFixed(0)} m · ~${formatEta(eta)} · ${profile(paceId).label}`;
+        // Indoors the fixed costs usually dominate, so they are shown rather than buried
+        // in an average speed. A commander who sees "62% doors and corners" learns
+        // something about the route that a single ETA does not tell them.
+        const pf = profile(paceId);
+        const share = Math.round(fixedShare(lastPath.traverse, paceId) * 100);
+        const breakdown = S.derived.unscaled ? '' :
+          `<div class="pace-note">${pf.note}<br>` +
+          `<span class="k">${pf.level_mps.toFixed(2)} m/s level · ${pf.stair_mps.toFixed(2)} m/s stair · ` +
+          `${lastPath.traverse.doors} doors × ${pf.door_s}s · ${lastPath.traverse.turns} turns × ${pf.turn_s}s ` +
+          `→ ${share}% of the time is doors and corners</span></div>`;
+        const turns = S.derived.unscaled ? '' :
+          '<div class="turn-list">' + lastPath.steps.map((st) =>
+            `<div class="turn-line turn-${st.turn.toLowerCase()}"><span class="arrow">${ARROW[st.turn]}</span>${st.text}</div>`,
+          ).join('') + '</div>';
         $('route-out').innerHTML =
           `<div class="route-hdr">${r.doors} doors · ${r.nodes.length} spaces · ${dist}</div>` +
+          breakdown +
+          turns +
           r.nodes.map((k, i) => {
             const n = ref.gr.nodes.get(k)!;
             const e = r.edges[i - 1];
@@ -99,6 +140,23 @@ export function installRouting(S: Session, plan: Plan2D, overlays: Overlays, ref
     },
   };
 
+  /**
+   * The live instruction for a point in the flight. The camera is at `k` of the total
+   * arc, so the current step is the last one whose anchor point lies at or behind it.
+   * Captioning is why `steps` carry a point index at all: a distance alone could not be
+   * matched to the curve the camera is actually on.
+   */
+  const showCaption = (k: number): void => {
+    const el = $('walk-caption');
+    const n = lastPath.points.length;
+    if (n < 2 || lastPath.steps.length === 0) { el.classList.remove('on'); return; }
+    const at = k * (n - 1);
+    let cur = lastPath.steps[0];
+    for (const s of lastPath.steps) { if (s.at <= at + 0.5) cur = s; else break; }
+    el.textContent = cur.text;
+    el.classList.add('on');
+  };
+
   /** Reflects the current route/scale into the walkthrough button. No-op while it is playing — that transition is owned by finishPlayback(). */
   const syncWalkBtn = (): void => {
     if (playing) return;
@@ -108,8 +166,9 @@ export function installRouting(S: Session, plan: Plan2D, overlays: Overlays, ref
       ? 'Blocked: the model is UNSCALED. Set a real scale before timing a route.'
       : !playable
         ? 'Compute a route between two different spaces first.'
-        : `Fly the route at walking pace (${formatEta(etaSeconds(lastPath.length_m))}, ` +
-          `${formatPace(lastPath.length_m)}). It plays to the end once started.`;
+        : `Fly the route at ${profile(paceId).label} pace ` +
+          `(${formatEta(etaSeconds(lastPath.traverse, paceId))}, ` +
+          `${formatPace(lastPath.traverse, paceId)}). It plays to the end once started.`;
   };
 
   /**
@@ -127,6 +186,8 @@ export function installRouting(S: Session, plan: Plan2D, overlays: Overlays, ref
 
   const finishPlayback = (): void => {
     playing = false;
+    viewer.onPathProgress = null;
+    $('walk-caption').classList.remove('on');
     if (pollId !== null) { clearInterval(pollId); pollId = null; }
     walkBtn.textContent = 'Animated walkthrough';
     walkBtn.classList.remove('on');
@@ -139,10 +200,31 @@ export function installRouting(S: Session, plan: Plan2D, overlays: Overlays, ref
     playing = true;
     walkBtn.classList.add('on');
     walkBtn.disabled = true;
-    walkBtn.textContent = `Playing · ${formatEta(etaSeconds(lastPath.length_m))} · ${formatPace(lastPath.length_m)}`;
+    walkBtn.textContent = `Playing · ${formatEta(etaSeconds(lastPath.traverse, paceId))} · ${formatPace(lastPath.traverse, paceId)}`;
     setControlsLocked(true);
-    viewer.followPath(lastPath.points, WALK_HEIGHT_M, walkFlightMs(lastPath.length_m), true);
+    viewer.followPath(
+      lastPath.points, WALK_RISE_M, walkFlightMs(lastPath.traverse, paceId), true, WALK_LEASH_M,
+    );
+    showCaption(0);
+    viewer.onPathProgress = showCaption;
     pollId = window.setInterval(() => { if (!viewer.busy) finishPlayback(); }, 150);
+  };
+
+  // The pace profiles, and the honest note under whichever is selected. Changing the
+  // profile recomputes the route rather than just relabelling it: the preview duration,
+  // the button text and the ETA all derive from it.
+  for (const p of PROFILES) {
+    const opt = document.createElement('option');
+    opt.value = p.id;
+    opt.textContent = p.label;
+    opt.title = p.note;
+    paceSel.appendChild(opt);
+  }
+  paceSel.value = paceId;
+  paceSel.onchange = () => {
+    if (playing) return;
+    paceId = paceSel.value as ProfileId;
+    state.showRoute();
   };
 
   $('btn-route').onclick = state.showRoute;
@@ -151,20 +233,13 @@ export function installRouting(S: Session, plan: Plan2D, overlays: Overlays, ref
 
   $('btn-save-route').onclick = () => {
     if (!state.currentRoute) return;
+    // The saved leg is the searched walkable path, not the centroid line. What a
+    // commander is briefed on has to be the path that was previewed and timed.
     const legs = new Map<string, Array<[number, number]>>();
-    for (let i = 0; i < state.currentRoute.nodes.length; i++) {
-      const n = ref.gr.nodes.get(state.currentRoute.nodes[i]);
-      if (n?.room_id) {
-        const arr = legs.get(n.storey_id) ?? [];
-        arr.push(n.centre_u);
-        legs.set(n.storey_id, arr);
-      }
-      const e = state.currentRoute.edges[i];
-      if (e) {
-        const arr = legs.get(e.storey_id) ?? [];
-        arr.push(e.point_u);
-        legs.set(e.storey_id, arr);
-      }
+    for (const p of lastPath.plan) {
+      const arr = legs.get(p.storey_id) ?? [];
+      arr.push([p.x_u, p.y_u]);
+      legs.set(p.storey_id, arr);
     }
     const to = ref.gr.nodes.get(toSel.value)!;
     S.do('ADD_ROUTE', [`route-${toSel.value}`], {

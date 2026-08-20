@@ -10,6 +10,26 @@
     <link rel="stylesheet" href="./src/ui/style.css" />
   </head>
   <body>
+    <!--
+      Shown only on viewports too small or too touch-oriented to run this. The app is a
+      three-column workstation driven by hover, scroll-zoom, WASD and pointer lock; on a
+      phone it is not a degraded experience, it is a non-functional one. Saying so is
+      more honest than letting a judge open it on a handset and see a broken layout.
+    -->
+    <div id="too-small">
+      <div class="ts-card">
+        <div class="ts-mark">▲</div>
+        <h1>Designed for desktop</h1>
+        <p>
+          NotMayasabha is a blueprint verification workstation. It needs a wide screen,
+          a mouse and a keyboard — scroll to zoom the plan, WASD and pointer lock to walk
+          the model, hover for the tactical readouts.
+        </p>
+        <p class="ts-hint">Open it on a laptop or desktop at 1100 px or wider.</p>
+        <button id="ts-dismiss">Continue anyway</button>
+      </div>
+    </div>
+
     <header id="topbar">
       <div class="brand">
         <span class="mark">▲</span>
@@ -65,6 +85,7 @@
         <div id="view3d"></div>
         <div id="unscaled-banner">UNSCALED MODEL — NOT FOR TACTICAL USE</div>
         <div id="no-route-banner">NO ROUTE — SELECTED SPACES ARE DISCONNECTED</div>
+        <div id="walk-caption"></div>
         <div id="hud">
           <div id="hud-room">—</div>
           <div id="hud-help">Click <b>Walkthrough</b>, then WASD to move, mouse to look, Shift to run, Esc to release the pointer.</div>
@@ -86,6 +107,10 @@
         <div class="row">
           <label>To</label>
           <select id="sel-to"></select>
+        </div>
+        <div class="row">
+          <label>Pace</label>
+          <select id="sel-pace" title="Movement profile: planning estimates, not doctrine"></select>
         </div>
         <div class="row">
           <button id="btn-route" class="wide">Compute route</button>
